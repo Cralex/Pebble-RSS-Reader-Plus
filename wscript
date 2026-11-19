@@ -11,15 +11,9 @@ out = 'build'
 def options(ctx):
     ctx.load('pebble_sdk')
 
-    ctx.load('aplite_legacy', tooldir='waftools')
-    ctx.load('configure_appinfo', tooldir='waftools')
-    ctx.load('pebble_sdk_version', tooldir='waftools')
-
 
 def configure(ctx):
     ctx.load('pebble_sdk')
-
-    ctx.configure_appinfo([ctx.appinfo_bitmap_to_png])
 
     if ctx.env.TARGET_PLATFORMS:
         for platform in ctx.env.TARGET_PLATFORMS:
@@ -118,7 +112,7 @@ def concat_javascript(ctx, js_path=None):
                 """ % (relpath))
             body = coffeescript.compile(body)
             # change ".coffee" or ".js.coffee" extensions to ".js"
-            relpath = re.sub('(\.js)?\.coffee$', '.js', relpath)
+            relpath = re.sub(r'(\.js)?\.coffee$', '.js', relpath)
             return relpath, body
 
         sources = []

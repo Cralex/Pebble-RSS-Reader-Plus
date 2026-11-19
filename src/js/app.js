@@ -145,8 +145,24 @@ function getArticles(feed) {
 		jsonUrl = jsonUrl + "&api_key=" + rss2jsonApiKey + "&count=100";
 	}
 
+	function showLoadError() {
+		if (rss2jsonApiKey === "") {
+			problemCard.body("Cannot retrieve articles. Try generating an api key at rss2json.com, and adding it in Settings.");
+		}
+		else {
+			problemCard.body("Cannot retrieve articles. The rss2json api isn't working.");
+		}
+		problemCard.show();
+	}
+
 	ajax({ url: jsonUrl }, function(json) {
-		json = JSON.parse(json);
+		try {
+			json = JSON.parse(json);
+		}
+		catch (e) {
+			showLoadError();
+			return;
+		}
 		if (json.status === "ok") {
 			items = json.items; 
 			items.forEach(function(item) {
@@ -166,14 +182,11 @@ function getArticles(feed) {
 			});
 		}
 		else {
-			if (rss2jsonApiKey === "") {
-				problemCard.body("Cannot retrieve articles. Try generating an api key at rss2json.com, and adding it in Settings.");
-			}
-			else {
-				problemCard.body("Cannot retrieve articles. The rss2json api isn't working.");
-			}
-			problemCard.show();
+			showLoadError();
 		}
+	}, function() {
+		// rss2json reports bad feeds (422) and rate limiting (429) as HTTP errors.
+		showLoadError();
 	});
 	/* Handle case where user returned to menu while article was loading. */
 	loadingCard.on('hide', function() {
