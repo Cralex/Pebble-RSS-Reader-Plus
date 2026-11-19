@@ -520,7 +520,7 @@ function welcomeScreen1() {
 		down: 'images/action_down.png'
 	});	
 
-	welcomeCard.body("Welcome to RSS Reader +!\n\nBefore you start reading articles, there's a few things you should know!");
+	welcomeCard.body("Welcome to RSS Reader+!\n\nBefore you start reading articles, there's a few things you should know!");
 	welcomeCard.show();
 
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.
