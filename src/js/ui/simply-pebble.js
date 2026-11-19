@@ -514,6 +514,22 @@ var CardStylePacket = new struct([
   ['uint8', 'style', CardStyleType],
 ]);
 
+// Fit a card's body to the screen. mode: 0 off, 1 page (show what fits), 2 end of paragraph
+// (may shrink the font to fit it all). The watch answers with a CardFitEventPacket.
+var CardFitModes = ['none', 'page', 'end'];
+
+var CardFitPacket = new struct([
+  [Packet, 'packet'],
+  ['uint8', 'mode'],
+  ['uint16', 'id'],
+]);
+
+var CardFitEventPacket = new struct([
+  [Packet, 'packet'],
+  ['uint16', 'id'],
+  ['uint16', 'length'],
+]);
+
 var VibePacket = new struct([
   [Packet, 'packet'],
   ['uint8', 'type', VibeType],
@@ -805,6 +821,8 @@ var CommandPackets = [
   VoiceDictationStartPacket,
   VoiceDictationStopPacket,
   VoiceDictationDataPacket,
+  CardFitPacket,
+  CardFitEventPacket,
 ];
 
 var accelAxes = [
@@ -1086,6 +1104,12 @@ SimplyPebble.cardStyle = function(field, style) {
   SimplyPebble.sendPacket(CardStylePacket.style(style));
 };
 
+SimplyPebble.cardFit = function(fit) {
+  var mode = fit ? CardFitModes.indexOf(fit.mode) : 0;
+  CardFitPacket.mode(mode === -1 ? 0 : mode).id(fit ? fit.id : 0);
+  SimplyPebble.sendPacket(CardFitPacket);
+};
+
 SimplyPebble.card = function(def, clear, pushing) {
   if (arguments.length === 3) {
     SimplyPebble.windowShow({ type: 'card', pushing: pushing });
@@ -1106,6 +1130,8 @@ SimplyPebble.card = function(def, clear, pushing) {
       SimplyPebble.cardImage(k, def[k]);
     } else if (k === 'style') {
       SimplyPebble.cardStyle(k, def[k]);
+    } else if (k === 'fit') {
+      SimplyPebble.cardFit(def[k]);
     }
   }
 };
@@ -1477,6 +1503,9 @@ SimplyPebble.onPacket = function(buffer, offset) {
       break;
     case VoiceDictationDataPacket:
       SimplyPebble.onVoiceData(packet);
+      break;
+    case CardFitEventPacket:
+      Window.emit('fit', null, { id: packet.id(), length: packet.length() });
       break;
   }
 };

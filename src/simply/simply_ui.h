@@ -33,6 +33,30 @@ struct SimplyUiTextfield {
   GColor8 color;
 };
 
+typedef enum SimplyUiFitMode SimplyUiFitMode;
+
+//! How the body of a non-scrolling card is fitted to the screen.
+enum SimplyUiFitMode {
+  SimplyUiFitNone = 0,
+  //! Show as many whole words of the body as fit, followed by a "›" if any are left out.
+  SimplyUiFitPage,
+  //! The body is the end of a paragraph: as SimplyUiFitPage, but if splitting it would leave
+  //! only a little for the next page (a third of a page or less), show it all in the smaller
+  //! font instead, if that fits.
+  SimplyUiFitEnd,
+};
+
+typedef struct SimplyUiFit SimplyUiFit;
+
+//! The fitted body, and how much of it was shown (reported to JS with the id it was asked with).
+struct SimplyUiFit {
+  uint8_t mode;
+  uint16_t id;
+  bool dirty;          //!< The body or mode changed since the text was last fitted
+  bool use_small_font;
+  char *text;          //!< What's drawn: the start of the body, plus "›" if it was cut
+};
+
 typedef struct SimplyUiLayer SimplyUiLayer;
 
 struct SimplyUiLayer {
@@ -41,6 +65,7 @@ struct SimplyUiLayer {
   SimplyUiTextfield textfields[3];
   uint32_t imagefields[3];
   GFont custom_body_font;
+  SimplyUiFit fit;
 };
 
 typedef struct SimplyUi SimplyUi;

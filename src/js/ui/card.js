@@ -32,7 +32,10 @@ var actionProps = [
 
 var configProps = [
   'style',
-  'backgroundColor'
+  'backgroundColor',
+  // false, or { mode: 'page' | 'end', id: Number }: fit the body to the screen (see
+  // SimplyPebble.cardFit). The watch emits a 'fit' event with how many bytes it showed.
+  'fit',
 ];
 
 var accessorProps = textProps.concat(textColorProps).concat(imageProps).concat(configProps);
@@ -41,6 +44,8 @@ var clearableProps = textProps.concat(imageProps);
 var defaults = {
   status: true,
   backgroundColor: 'white',
+  // Always sent: the watch's card is shared, so a card without it would keep the last one's.
+  fit: false,
 };
 
 var Card = function(cardDef) {
