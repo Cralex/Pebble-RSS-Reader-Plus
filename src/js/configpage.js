@@ -1,9 +1,16 @@
 /*
  * The settings page, built on the phone with Clay (https://github.com/pebble/clay) so it
- * doesn't need to be hosted anywhere. Based on the old hosted page in docs/index.html.
+ * doesn't need to be hosted anywhere.
  *
- * Clay can't add form fields after the page is built, so the feed list is a fixed set of
- * slots: empty ones are hidden, and "Add feed" / "Remove last feed" show and hide them.
+ * Clay can't add form fields after the page is built, so the feed list is a set of slots
+ * sized when the page opens (the saved feeds plus some spare): empty ones are hidden, and
+ * "Add feed" / "Remove last feed" show and hide them.
+ *
+ * OPML import/export uses plain text boxes, which work in every phone's web view (file pickers
+ * and downloads depend on the phone app). Imported feeds aren't put into slots, so there's no
+ * limit on how many: the page parses the OPML for feedback, passes the feeds back in a hidden
+ * field, and they're merged into the list on save, skipping URLs that are already there.
+ *
  * The app's feed list lives in Settings.option('feeds'); this module converts to and from
  * Clay's flat feedNameN / feedUrlN fields.
  *
@@ -14,14 +21,19 @@
 
 var Clay = require('clay');
 
-var MAX_FEEDS = 20;
+var MIN_SLOTS = 20;
+var SPARE_SLOTS = 10;
 
-function buildConfig() {
+var TEXTAREA_STYLE = 'display:block;width:100%;box-sizing:border-box;min-height:7em;margin-top:0.5em;' +
+	'padding:0.5em;border:none;border-radius:0.25rem;background:#414141;color:#fff;' +
+	'font-family:monospace;font-size:12px;';
+
+function buildConfig(slotCount) {
 	var feedItems = [{
 		type: 'heading',
 		defaultValue: 'RSS Feeds'
 	}];
-	for (var i = 1; i <= MAX_FEEDS; i++) {
+	for (var i = 1; i <= slotCount; i++) {
 		feedItems.push({
 			type: 'input',
 			messageKey: 'feedName' + i,
@@ -46,9 +58,37 @@ function buildConfig() {
 		defaultValue: 'Remove last feed'
 	});
 
+	var opmlItems = [{
+		type: 'heading',
+		defaultValue: 'Import / Export (OPML)'
+	}, {
+		type: 'text',
+		defaultValue: 'To import feeds from another reader, paste its OPML export here. ' +
+			'They\'ll be added to your feeds when you save; ones you already have are skipped.' +
+			'<textarea id="opml-import" style="' + TEXTAREA_STYLE + '" placeholder="Paste OPML here" ' +
+			'autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>' +
+			'<span id="opml-import-status"></span>'
+	}, {
+		// Carries the parsed import back to the app; hidden once the page is built.
+		type: 'input',
+		messageKey: 'opmlImport',
+		label: 'Import data'
+	}, {
+		type: 'text',
+		defaultValue: 'To export, copy this OPML into a file or another reader:' +
+			'<textarea id="opml-export" style="' + TEXTAREA_STYLE + '" readonly></textarea>'
+	}, {
+		type: 'button',
+		id: 'copyOpml',
+		defaultValue: 'Copy OPML'
+	}];
+
 	return [{
 		type: 'section',
 		items: feedItems
+	}, {
+		type: 'section',
+		items: opmlItems
 	}, {
 		type: 'text',
 		defaultValue: '<i>Your Pebble will only display content included in your RSS feed. If a feed only contains headlines, you will only be able to read headlines. You may be able to turn headline-only feeds into full-text feeds with fivefilters.org/content-only/.</i>'
@@ -68,15 +108,33 @@ function pageScript() {
 	clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
 		var slots = [];
 		for (var n = 1; clayConfig.getItemByMessageKey('feedName' + n); n++) {
-			slots.push(clayConfig.getItemsByGroup('feed' + n));
+			slots.push({
+				name: clayConfig.getItemByMessageKey('feedName' + n),
+				url: clayConfig.getItemByMessageKey('feedUrl' + n),
+				items: clayConfig.getItemsByGroup('feed' + n)
+			});
 		}
 
+		function value(item) {
+			return String(item.get() || '').trim();
+		}
 		function isEmpty(slot) {
-			return slot.every(function(item) { return !String(item.get() || '').trim(); });
+			return !value(slot.name) && !value(slot.url);
 		}
-		function setVisible(slot, visible) {
-			slot.forEach(function(item) { if (visible) { item.show(); } else { item.hide(); } });
+		function feedKey(url) {
+			return url.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
 		}
+		function currentFeeds() {
+			var feeds = [];
+			slots.forEach(function(slot) {
+				if (value(slot.name) && value(slot.url)) {
+					feeds.push({ title: value(slot.name), url: value(slot.url) });
+				}
+			});
+			return feeds;
+		}
+
+		/* ---- Feed slots ---- */
 
 		// Show every slot up to the last one in use, and at least one.
 		var visibleCount = 1;
@@ -87,54 +145,220 @@ function pageScript() {
 		var addButton = clayConfig.getItemById('addFeed');
 		var removeButton = clayConfig.getItemById('removeFeed');
 
-		function refresh() {
-			slots.forEach(function(slot, index) { setVisible(slot, index < visibleCount); });
+		function refreshSlots() {
+			slots.forEach(function(slot, index) {
+				slot.items.forEach(function(item) {
+					if (index < visibleCount) { item.show(); } else { item.hide(); }
+				});
+			});
 			if (visibleCount < slots.length) { addButton.show(); } else { addButton.hide(); }
 		}
 
 		addButton.on('click', function() {
 			if (visibleCount < slots.length) {
 				visibleCount++;
-				refresh();
+				refreshSlots();
 			}
 		});
 		removeButton.on('click', function() {
-			slots[visibleCount - 1].forEach(function(item) { item.set(''); });
+			slots[visibleCount - 1].items.forEach(function(item) { item.set(''); });
 			if (visibleCount > 1) {
 				visibleCount--;
 			}
-			refresh();
+			refreshSlots();
+			refreshExport();
 		});
 
-		refresh();
+		/* ---- OPML export ---- */
+
+		var exportBox = document.getElementById('opml-export');
+
+		function escapeXml(text) {
+			return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+				.replace(/"/g, '&quot;');
+		}
+		function refreshExport() {
+			var lines = [
+				'<?xml version="1.0" encoding="UTF-8"?>',
+				'<opml version="2.0">',
+				'  <head><title>Pebble RSS Reader feeds</title></head>',
+				'  <body>'
+			];
+			currentFeeds().forEach(function(feed) {
+				var title = escapeXml(feed.title);
+				lines.push('    <outline type="rss" text="' + title + '" title="' + title +
+					'" xmlUrl="' + escapeXml(feed.url) + '"/>');
+			});
+			lines.push('  </body>', '</opml>');
+			exportBox.value = lines.join('\n');
+		}
+
+		var copyButton = clayConfig.getItemById('copyOpml');
+		copyButton.on('click', function() {
+			function report(copied) {
+				copyButton.set(copied ? 'Copied!' : 'Select the text above and copy it');
+				setTimeout(function() { copyButton.set('Copy OPML'); }, 2500);
+			}
+			function selectAndCopy() {
+				exportBox.focus();
+				exportBox.select();
+				exportBox.setSelectionRange(0, exportBox.value.length);
+				try {
+					return document.execCommand('copy');
+				} catch (e) {
+					return false;
+				}
+			}
+			if (navigator.clipboard && window.isSecureContext) {
+				navigator.clipboard.writeText(exportBox.value).then(function() {
+					report(true);
+				}, function() {
+					report(selectAndCopy());
+				});
+			} else {
+				report(selectAndCopy());
+			}
+		});
+
+		/* ---- OPML import ---- */
+
+		var importBox = document.getElementById('opml-import');
+		var importStatus = document.getElementById('opml-import-status');
+		var importItem = clayConfig.getItemByMessageKey('opmlImport');
+		importItem.hide();
+		importItem.set('');
+
+		function attribute(element, name) {
+			// Case-insensitive: exporters disagree on xmlUrl vs xmlurl.
+			for (var i = 0; i < element.attributes.length; i++) {
+				if (element.attributes[i].name.toLowerCase() === name) {
+					return element.attributes[i].value.trim();
+				}
+			}
+			return '';
+		}
+		function parseOpml(text) {
+			var doc = new DOMParser().parseFromString(text, 'text/xml');
+			if (doc.getElementsByTagName('parsererror').length) {
+				// Not well-formed XML (some exporters don't escape "&"): read it leniently instead.
+				doc = new DOMParser().parseFromString(text, 'text/html');
+			}
+			var outlines = doc.getElementsByTagName('outline');
+			var feeds = [];
+			for (var i = 0; i < outlines.length; i++) {
+				// Folders are outlines without an xmlUrl; their feeds are flattened into one list.
+				var url = attribute(outlines[i], 'xmlurl');
+				if (url) {
+					feeds.push({
+						title: attribute(outlines[i], 'title') || attribute(outlines[i], 'text') || url,
+						url: url
+					});
+				}
+			}
+			return feeds;
+		}
+		function refreshImport() {
+			var text = importBox.value.trim();
+			if (!text) {
+				importItem.set('');
+				importStatus.textContent = '';
+				return;
+			}
+			var feeds = parseOpml(text);
+			importItem.set(feeds.length ? JSON.stringify(feeds) : '');
+			if (!feeds.length) {
+				importStatus.textContent = 'No feeds found. Paste the whole OPML file, including the <outline> lines.';
+				return;
+			}
+			var known = {};
+			currentFeeds().forEach(function(feed) { known[feedKey(feed.url)] = true; });
+			var added = 0;
+			feeds.forEach(function(feed) {
+				var key = feedKey(feed.url);
+				if (!known[key]) {
+					known[key] = true;
+					added++;
+				}
+			});
+			var found = 'Found ' + feeds.length + (feeds.length === 1 ? ' feed' : ' feeds');
+			if (added === 0) {
+				importStatus.textContent = found + ', but you already have ' +
+					(feeds.length === 1 ? 'it' : 'all of them') + '.';
+			} else {
+				importStatus.textContent = found + (added === feeds.length ? '' : ' (' + added + ' new)') +
+					'. Save to add ' + (added === 1 ? 'it' : 'them') + '.';
+			}
+		}
+
+		importBox.addEventListener('input', refreshImport);
+
+		// Keep the export (and the import's "new" count) in step with edits to the feed list.
+		document.addEventListener('input', function(e) {
+			if (e.target !== importBox && e.target !== exportBox) {
+				refreshExport();
+				refreshImport();
+			}
+		}, true);
+
+		refreshSlots();
+		refreshExport();
 	});
 }
 
-var clay = new Clay(buildConfig(), pageScript, { autoHandleEvents: false });
+function feedKey(url) {
+	return String(url).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+}
 
 /* A data: URL for the settings page, filled in with the given feeds. */
 function url(feeds) {
-	var values = {};
-	for (var i = 1; i <= MAX_FEEDS; i++) {
+	var slotCount = Math.max(MIN_SLOTS, feeds.length + SPARE_SLOTS);
+	var values = { opmlImport: '' };
+	for (var i = 1; i <= slotCount; i++) {
 		var feed = feeds[i - 1];
 		values['feedName' + i] = feed ? feed.title : '';
 		values['feedUrl' + i] = feed ? feed.url : '';
 	}
+	var clay = new Clay(buildConfig(slotCount), pageScript, { autoHandleEvents: false });
 	clay.setSettings(values);
 	return clay.generateUrl();
 }
 
-/* The feeds in the page's response (Clay's { feedName1: { value: ... } } object). */
+/*
+ * The feeds in the page's response (Clay's { feedName1: { value: ... } } object): the slots in
+ * order, then any imported feeds whose URLs aren't already in the list.
+ */
 function feedsFromResponse(response) {
+	function value(key) {
+		var field = response[key];
+		return String((field && field.value) || '').trim();
+	}
+
 	var feeds = [];
-	for (var i = 1; i <= MAX_FEEDS; i++) {
-		var name = response['feedName' + i];
-		var feedUrl = response['feedUrl' + i];
-		var title = String((name && name.value) || '').trim();
-		var address = String((feedUrl && feedUrl.value) || '').trim();
-		if (title && address) {
+	var known = {};
+	function add(title, address) {
+		var key = feedKey(address);
+		if (title && address && !known[key]) {
+			known[key] = true;
 			feeds.push({ title: title, url: address });
 		}
+	}
+
+	for (var i = 1; response.hasOwnProperty('feedName' + i); i++) {
+		add(value('feedName' + i), value('feedUrl' + i));
+	}
+
+	var imported = [];
+	try {
+		imported = JSON.parse(value('opmlImport') || '[]');
+	} catch (e) {
+		imported = [];
+	}
+	if (Array.isArray(imported)) {
+		imported.forEach(function(feed) {
+			if (feed && typeof feed.url === 'string') {
+				add(String(feed.title || feed.url).trim(), feed.url.trim());
+			}
+		});
 	}
 	return feeds;
 }
