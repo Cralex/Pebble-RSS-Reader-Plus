@@ -2,6 +2,7 @@
 var UI = require('ui');
 var ajax = require('ajax');
 var feedparser = require('feedparser');
+var configPage = require('configpage');
 var Settings = require('settings');
 var Feature = require('platform/feature');
 
@@ -37,11 +38,14 @@ var defaultFeeds = [{
 	url: "https://www.sbnation.com/rss/index.xml"
 	}];
 
-Settings.config({url: 'https://wowfunhappy.github.io/Pebble-RSS-Reader/', hash: true}, function(){
-	if (typeof Settings.option().feeds === 'undefined' || Settings.option().feeds.length < 1) {
-		Settings.option("feeds", defaultFeeds);
+// The settings page is generated on the phone (see configpage.js); the url here is unused.
+Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
+	var savedFeeds = Settings.option().feeds;
+	return configPage.url(savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds);
+}, function(e){
+	if (!e.failed && e.options) {
+		Settings.option("feeds", configPage.feedsFromResponse(e.options));
 	}
-}, function(){
 	feedSelectMenu.hide(); // Will likely close app
 });
 
