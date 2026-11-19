@@ -16,7 +16,7 @@ var blackStatusBar = {
 
 var defaultFeeds = [{
 	title: "Vox",
-	url: "https://www.vox.com/rss/full.xml"
+	url: "https://www.vox.com/rss/index.xml"
 	},{
 	title: "The Atlantic",
 	url: "https://www.theatlantic.com/feed/all"
@@ -25,19 +25,19 @@ var defaultFeeds = [{
 	url: "http://news.vice.com/rss"
 	},{
 	title: "Time Magazine",
-	url: "http://feeds2.feedburner.com/time/topstories"
+	url: "https://time.com/feed/"
 	},{
 	title: "ProPublica",
-	url: "http://feeds.propublica.org/propublica/main"
+	url: "https://www.propublica.org/feeds/propublica/main"
 	},{
 	title: "The Verge",
-	url: "https://www.theverge.com/rss/full.xml"
+	url: "https://www.theverge.com/rss/index.xml"
 	},{
 	title: "Techcrunch",
-	url: "http://feeds.feedburner.com/TechCrunch/"
+	url: "https://techcrunch.com/feed/"
 	},{
 	title: "SBNation",
-	url: "http://feeds.feedburner.com/sportsblogs/sbnation.xml"
+	url: "https://www.sbnation.com/rss/index.xml"
 	},{
 	title: "Curbed",
 	url: "https://www.curbed.com/rss/full.xml"
