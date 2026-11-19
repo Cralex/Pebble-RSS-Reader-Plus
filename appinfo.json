@@ -55,14 +55,7 @@
     "emery"
   ],
   "usesPermissions": [
-    {
-      "name": "Internet",
-      "parameters": {
-        "domains": [
-          "api.rss2json.com"
-        ]
-      }
-    }
+    "Internet"
   ],
   "uuid": "f7db208c-a80b-4bca-b5fd-813f02c5570f",
   "versionCode": 1,
