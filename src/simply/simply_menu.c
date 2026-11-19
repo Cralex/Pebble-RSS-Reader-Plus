@@ -281,6 +281,9 @@ static void prv_reload_data(SimplyMenu *self) {
 #define TITLE_ROUND_INSET 16
 // Gothic 24 Bold's cap offset, which the firmware subtracts (measured against its rendering)
 #define TITLE_ROUND_CAP_OFFSET 5
+// Distance from the top of a Gothic 24 Bold line to the top of its capitals (measured)
+#define TITLE_ROUND_GLYPH_TOP 10
+#define TITLE_ROUND_WINDOW_MARGIN 2
 #define TITLE_TEXT_MAX_EXTENT 4000
 
 static GFont prv_title_font(void) {
@@ -338,13 +341,17 @@ static void prv_draw_scrolled_title(SimplyMenu *self, GContext *ctx, const Layer
                           prv_round_title_width(bounds.size), TITLE_TEXT_MAX_EXTENT);
   graphics_draw_text(ctx, title, prv_title_font(), box, GTextOverflowModeWordWrap,
                      GTextAlignmentCenter, NULL);
-  // Only show the two lines' worth of space the title normally gets: cover lines scrolling
-  // in or out above and below it with the highlight color.
+  // Only show two lines: cover lines scrolling in or out above and below with the highlight
+  // color. The window follows the letters rather than the text box, which has space above the
+  // capitals and none below the descenders, so it starts just above the first line's capitals
+  // and is two lines tall.
+  const int16_t window_top = top + TITLE_ROUND_GLYPH_TOP - TITLE_ROUND_WINDOW_MARGIN;
+  const int16_t window_bottom = window_top + visible_height;
   graphics_context_set_fill_color(ctx, gcolor8_get_or(self->menu_layer.highlight_background,
                                                       GColorBlack));
-  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, top), 0, GCornerNone);
-  graphics_fill_rect(ctx, GRect(0, top + visible_height, bounds.size.w,
-                                bounds.size.h - top - visible_height), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, window_top), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(0, window_bottom, bounds.size.w, bounds.size.h - window_bottom),
+                     0, GCornerNone);
 #else
   const int16_t line_height = prv_title_line_height();
   const GRect box = GRect(TITLE_RECT_INSET - offset, (bounds.size.h - (line_height + 10)) / 2,
