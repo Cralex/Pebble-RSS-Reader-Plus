@@ -42,13 +42,23 @@ var defaultFeeds = [{
 // The settings page is generated on the phone (see configpage.js); the url here is unused.
 Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 	var savedFeeds = Settings.option().feeds;
-	return configPage.url(savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds);
+	return configPage.url({
+		feeds: savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds,
+		wrapFeedList: wrapFeedList()
+	});
 }, function(e){
 	if (!e.failed && e.options) {
-		Settings.option("feeds", configPage.feedsFromResponse(e.options));
+		var saved = configPage.settingsFromResponse(e.options);
+		Settings.option("feeds", saved.feeds);
+		Settings.option("wrapFeedList", saved.wrapFeedList);
 	}
 	feedSelectMenu.hide(); // Will likely close app
 });
+
+/* Whether up/down wrap around at the ends of the feed list (a setting; on by default). */
+function wrapFeedList() {
+	return Settings.option("wrapFeedList") !== false;
+}
 
 /*-----------------------------------------------------------------------------*/
 
@@ -102,6 +112,7 @@ function selectFeed() {
 
 	feedSelectMenu = new UI.Menu({
 		status: false,
+		wrap: wrapFeedList(),
 		sections: [{
 			title: "Select Feed:",
 			items: feeds

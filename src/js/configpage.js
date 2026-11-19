@@ -83,9 +83,23 @@ function buildConfig(slotCount) {
 		defaultValue: 'Copy OPML'
 	}];
 
+	var optionItems = [{
+		type: 'heading',
+		defaultValue: 'Options'
+	}, {
+		type: 'toggle',
+		messageKey: 'wrapFeedList',
+		label: 'Wrap around the feed list',
+		description: 'Pressing up on the first feed goes to the last one, and down on the last goes to the first.',
+		defaultValue: true
+	}];
+
 	return [{
 		type: 'section',
 		items: feedItems
+	}, {
+		type: 'section',
+		items: optionItems
 	}, {
 		type: 'section',
 		items: opmlItems
@@ -309,10 +323,11 @@ function feedKey(url) {
 	return String(url).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
 
-/* A data: URL for the settings page, filled in with the given feeds. */
-function url(feeds) {
+/* A data: URL for the settings page, filled in with the given settings ({ feeds, wrapFeedList }). */
+function url(settings) {
+	var feeds = settings.feeds;
 	var slotCount = Math.max(MIN_SLOTS, feeds.length + SPARE_SLOTS);
-	var values = { opmlImport: '' };
+	var values = { opmlImport: '', wrapFeedList: settings.wrapFeedList };
 	for (var i = 1; i <= slotCount; i++) {
 		var feed = feeds[i - 1];
 		values['feedName' + i] = feed ? feed.title : '';
@@ -324,9 +339,18 @@ function url(feeds) {
 }
 
 /*
- * The feeds in the page's response (Clay's { feedName1: { value: ... } } object): the slots in
- * order, then any imported feeds whose URLs aren't already in the list.
+ * The settings in the page's response (Clay's { feedName1: { value: ... } } object):
+ * { feeds, wrapFeedList }. The feeds are the slots in order, then any imported feeds whose
+ * URLs aren't already in the list.
  */
+function settingsFromResponse(response) {
+	var wrap = response.wrapFeedList;
+	return {
+		feeds: feedsFromResponse(response),
+		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true
+	};
+}
+
 function feedsFromResponse(response) {
 	function value(key) {
 		var field = response[key];
@@ -365,5 +389,5 @@ function feedsFromResponse(response) {
 
 module.exports = {
 	url: url,
-	feedsFromResponse: feedsFromResponse
+	settingsFromResponse: settingsFromResponse
 };

@@ -44,6 +44,7 @@ struct __attribute__((__packed__)) MenuPropsPacket {
   GColor8 text_color;
   GColor8 highlight_background_color;
   GColor8 highlight_text_color;
+  bool wrap;
 };
 
 typedef struct MenuSectionPacket MenuSectionPacket;
@@ -691,9 +692,46 @@ static void prv_single_click_handler(ClickRecognizerRef recognizer, void *contex
   simply_window_single_click_handler(recognizer, window);
 }
 
+//! The last row of the last section, or false if the menu is empty.
+static bool prv_get_last_index(SimplyMenu *self, MenuIndex *index_out) {
+  MenuLayer *menu_layer = self->menu_layer.menu_layer;
+  const uint16_t num_sections = prv_menu_get_num_sections_callback(menu_layer, self);
+  if (num_sections == 0) { return false; }
+  const uint16_t section = num_sections - 1;
+  const uint16_t num_rows = prv_menu_get_num_rows_callback(menu_layer, section, self);
+  if (num_rows == 0) { return false; }
+  *index_out = (MenuIndex) { .section = section, .row = num_rows - 1 };
+  return true;
+}
+
+//! Up/down, as the firmware's MenuLayer does them, plus wrapping around at the ends when the
+//! menu asks for it. Holding a button doesn't wrap, so a held button stops at the end.
+static void prv_up_down_click_handler(ClickRecognizerRef recognizer, void *context) {
+  MenuLayer *menu_layer = context;
+  SimplyMenu *self = window_get_user_data(layer_get_window(menu_layer_get_layer(menu_layer)));
+  const bool up = (click_recognizer_get_button_id(recognizer) == BUTTON_ID_UP);
+  const bool animated = true;
+
+  MenuIndex last;
+  if (self && self->menu_layer.wrap && !click_recognizer_is_repeating(recognizer) &&
+      prv_get_last_index(self, &last)) {
+    const MenuIndex selected = menu_layer_get_selected_index(menu_layer);
+    const MenuIndex first = { .section = 0, .row = 0 };
+    const MenuIndex *at_end = up ? &first : &last;
+    if (selected.section == at_end->section && selected.row == at_end->row) {
+      menu_layer_set_selected_index(menu_layer, up ? last : first, MenuRowAlignCenter, animated);
+      return;
+    }
+  }
+  menu_layer_set_selected_next(menu_layer, up, MenuRowAlignCenter, animated);
+}
+
 static void prv_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_BACK, prv_single_click_handler);
   menu_layer_click_config(context);
+  // Replace the MenuLayer's up/down handlers (same 100 ms repeat) to support wrapping around.
+  window_single_repeating_click_subscribe(BUTTON_ID_UP, 100, prv_up_down_click_handler);
+  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 100, prv_up_down_click_handler);
   
   /*🚨🚨🚨WOWFUNHAPPY HACK ALERT!🚨🚨🚨
   * I (Wowfunhappy) added the below multi_click_subscribe line. PebbleJS doesn't actually offer a way to handle multi_click events—this code has a different purpose.
@@ -807,6 +845,7 @@ static void prv_handle_menu_props_packet(Simply *simply, Packet *data) {
   SimplyMenu *self = simply->menu;
 
   simply_menu_set_num_sections(self, packet->num_sections);
+  self->menu_layer.wrap = packet->wrap;
 
   if (!self->window.window) { return; }
 

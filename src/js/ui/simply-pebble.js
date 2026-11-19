@@ -571,6 +571,7 @@ var MenuPropsPacket = new struct([
   ['uint8', 'textColor', ColorType],
   ['uint8', 'highlightBackgroundColor', ColorType],
   ['uint8', 'highlightTextColor', ColorType],
+  ['bool', 'wrap', BoolType],
 ]);
 
 var MenuSectionPacket = new struct([

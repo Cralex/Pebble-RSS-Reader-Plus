@@ -12,6 +12,9 @@ var defaults = {
   textColor: 'black',
   highlightBackgroundColor: 'black',
   highlightTextColor: 'white',
+  // Whether up/down wrap around at the ends of the menu. Always sent, because the props packet
+  // keeps the previous menu's value for any field a menu leaves out.
+  wrap: false,
 };
 
 var Menu = function(menuDef) {
