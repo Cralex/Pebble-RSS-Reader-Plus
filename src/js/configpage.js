@@ -195,7 +195,7 @@ function pageScript() {
 			var lines = [
 				'<?xml version="1.0" encoding="UTF-8"?>',
 				'<opml version="2.0">',
-				'  <head><title>Pebble RSS Reader feeds</title></head>',
+				'  <head><title>RSS Reader Plus feeds</title></head>',
 				'  <body>'
 			];
 			currentFeeds().forEach(function(feed) {

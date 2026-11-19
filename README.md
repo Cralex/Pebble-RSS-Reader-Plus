@@ -1,20 +1,32 @@
-![Banner](https://github.com/Wowfunhappy/Pebble-RSS-Reader/raw/master/Banner.png)
+![Banner](Banner.png)
+
+# RSS Reader Plus
 
 Hands full? No problem! As long as you have a Pebble smartwatch and at least one free finger, you can read the news—no pulling out your phone required.
 
-_Pebble RSS Reader_ is the _only_ way to read complete news articles, blog posts, or anything else with an RSS feed on your Pebble smartwatch. An unlimited number of feeds are supported, as are articles of any length. Peruse the default feeds, or add your own in Settings.
+_RSS Reader Plus_ (shown on the watch as _RSS Reader +_) lets you read complete news articles, blog posts, or anything else with an RSS or Atom feed on your Pebble smartwatch. An unlimited number of feeds are supported, as are articles of any length. Peruse the default feeds, or add your own in Settings.
 
-**[Download Now From The Appstore!](https://apps.rebble.io/en_US/application/5d8d503bc393f5215a13e5e6)**
+## What's new compared to Pebble RSS Reader
 
----
+RSS Reader Plus is a continuation of [Pebble RSS Reader](https://github.com/Wowfunhappy/Pebble-RSS-Reader) by Jonathan Alland (Wowfunhappy), which hasn't been updated in years.
 
-This is a PebbleJS project, so most of the code specific to this app can be found in [app.js](https://github.com/Wowfunhappy/Pebble-RSS-Reader/blob/master/src/js/app.js). Feel free to ask me questions about how I did anything. If you want to reuse any code, please do note that it's licensed under the GPL (v3 or later). If this license is somehow preventing you from making something awesome, get in touch and we'll work it out.
+- Builds with the current Pebble SDK and works with the current Pebble phone app.
+- Feeds are downloaded and read directly on your phone, with no third-party service in between (so no rss2json account or rate limits).
+- Article pages are sized by the watch itself, so text isn't cut off on round watches and fills the screen on larger ones.
+- The settings page is built into the app, and can import and export your feeds as OPML.
+- Long article titles scroll so you can read them in full, the feed list can wrap around at either end, and round watches show the feed name above its articles.
+- Fixes for a crash when returning to the article list, and for getting stuck on "Loading..." when a feed can't be read.
 
-The issue tracker contains a bunch of "wish list" items which I don't expect I'll ever get around to myself. Help with any of them would be *greatly* appreciated.
+## Development
 
-Lots of thanks to:
-* Cralex (testing)
-* Molayl (rss2json api)
-* Rebble Team
+This is a PebbleJS project, so most of the code specific to this app is in [src/js/app.js](src/js/app.js), with the settings page in [src/js/configpage.js](src/js/configpage.js) and feed parsing in [src/js/lib/feedparser.js](src/js/lib/feedparser.js). Build it with the [Pebble SDK](https://developer.repebble.com/sdk/) using `pebble build`.
+
+The code is licensed under the GPL (v3 or later); see [LICENSE](LICENSE). The settings page uses [Clay](https://github.com/pebble/clay) (MIT).
+
+## Thanks
+
+- Jonathan Alland (Wowfunhappy), who wrote Pebble RSS Reader
+- Molayl (rss2json api), which the original app used to read feeds
+- Rebble Team
 
 ...and every website that offers full-text RSS feeds
