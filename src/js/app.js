@@ -1,8 +1,12 @@
 // require('pebblejs');
 var UI = require('ui');
 var ajax = require('ajax');
+var feedparser = require('feedparser');
 var Settings = require('settings');
 var Feature = require('platform/feature');
+
+// The whole article list is saved to phone storage while reading, so keep it bounded.
+var MAX_ARTICLES = 50;
 
 var blackStatusBar = {
 	color: "white",
@@ -137,56 +141,43 @@ function getArticles(feed) {
 	Settings.data('savedFeed', feed);
 	
 	articleList = [];
-	jsonUrl = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(feed.url);
 
-	var rss2jsonApiKey = "";
-	if (typeof Settings.option().rss2jsonApiKey !== 'undefined') {
-		rss2jsonApiKey = Settings.option().rss2jsonApiKey;
-		jsonUrl = jsonUrl + "&api_key=" + rss2jsonApiKey + "&count=100";
-	}
-
-	function showLoadError() {
-		if (rss2jsonApiKey === "") {
-			problemCard.body("Cannot retrieve articles. Try generating an api key at rss2json.com, and adding it in Settings.");
-		}
-		else {
-			problemCard.body("Cannot retrieve articles. The rss2json api isn't working.");
-		}
+	function showLoadError(message) {
+		var problemCard = new UI.Card({status: blackStatusBar, scrollable: true});
+		problemCard.body(message);
 		problemCard.show();
+		loadingCard.hide();
 	}
 
-	ajax({ url: jsonUrl }, function(json) {
+	ajax({ url: feed.url }, function(body) {
+		var parsed;
 		try {
-			json = JSON.parse(json);
+			parsed = feedparser.parse(body);
 		}
 		catch (e) {
-			showLoadError();
+			parsed = null;
+		}
+		if (!parsed) {
+			showLoadError("Cannot read this feed. Check that its URL in Settings points to an RSS or Atom feed.");
 			return;
 		}
-		if (json.status === "ok") {
-			items = json.items; 
-			items.forEach(function(item) {
-				article = {
-					title: formatText(item.title),
-					author: formatText(item.author),
-					pages: makePages(item.content)
-				};
-				articleList.push(article);
-				if (articleList.length === json.items.length) {
-					if (loadingCardVisible) {
-						selectArticle(articleList, feed.title);
-					}
-					loadingCard.hide();
-					return;
-				}
+		if (parsed.items.length === 0) {
+			showLoadError("This feed doesn't have any articles right now.");
+			return;
+		}
+		parsed.items.slice(0, MAX_ARTICLES).forEach(function(item) {
+			articleList.push({
+				title: formatText(item.title),
+				author: formatText(item.author),
+				pages: makePages(item.content)
 			});
+		});
+		if (loadingCardVisible) {
+			selectArticle(articleList, feed.title);
 		}
-		else {
-			showLoadError();
-		}
-	}, function() {
-		// rss2json reports bad feeds (422) and rate limiting (429) as HTTP errors.
-		showLoadError();
+		loadingCard.hide();
+	}, function(body, status) {
+		showLoadError("Cannot retrieve articles" + (status ? " (error " + status + ")" : "") + ". Check your connection and the feed's URL in Settings.");
 	});
 	/* Handle case where user returned to menu while article was loading. */
 	loadingCard.on('hide', function() {
@@ -217,6 +208,9 @@ function makePages(content) {
 				pages = splitTextCleanly(pages, 72, 0, true, paragraphs[paragraphNum]);
 			}
 		}
+	}
+	if (pages.length === 0) {
+		pages.push(""); // Headline-only item: show the title with an empty body.
 	}
 	return pages;
 }
@@ -292,6 +286,10 @@ function formatText(text) {
 		text = text.replace(/&lt;/gi, '<');
 
 		text = text.replace(/&amp;/gi, "&");
+		// Numeric entities, decoded after &amp; so double-escaped ones like &amp;#8217; are fixed too.
+		text = text.replace(/&#x([0-9a-f]+);/gi, function(m, hex) { return String.fromCharCode(parseInt(hex, 16)); });
+		text = text.replace(/&#(\d+);/g, function(m, dec) { return String.fromCharCode(parseInt(dec, 10)); });
+		text = text.replace(/&apos;/gi, "'");
 
 		text = text.replace(/^[<>[\]]*$/g,'');
 		text = text.replace(/^Advertisement$/g,'');
