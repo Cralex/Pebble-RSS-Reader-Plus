@@ -578,10 +578,11 @@ static void prv_menu_draw_header_callback(GContext *ctx, const Layer *cell_layer
   graphics_context_set_text_color(ctx, gcolor8_get_or(section->title_foreground, GColorBlack));
 
   GTextAttributes *title_attributes = graphics_text_attributes_create();
+  // On round, keep the header inside the circle. (Paging, which this used before, pushed the
+  // header of the first section out of sight, so no feed name showed above the first article.)
   PBL_IF_ROUND_ELSE(
-      graphics_text_attributes_enable_paging_on_layer(
-          title_attributes, (Layer *)menu_layer_get_scroll_layer(self->menu_layer.menu_layer),
-          &bounds, TEXT_FLOW_DEFAULT_INSET), NOOP);
+      graphics_text_attributes_enable_screen_text_flow(title_attributes, TEXT_FLOW_DEFAULT_INSET),
+      NOOP);
   const GTextAlignment align = PBL_IF_ROUND_ELSE(GTextAlignmentCenter, GTextAlignmentLeft);
   graphics_draw_text(ctx, section->title, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
                      bounds, GTextOverflowModeTrailingEllipsis, align, title_attributes);

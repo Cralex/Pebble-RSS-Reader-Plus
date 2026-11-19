@@ -5,6 +5,7 @@ var feedparser = require('feedparser');
 var configPage = require('configpage');
 var Settings = require('settings');
 var Feature = require('platform/feature');
+var Vector2 = require('vector2');
 
 // The whole article list is saved to phone storage while reading, so keep it bounded.
 var MAX_ARTICLES = 50;
@@ -124,15 +125,17 @@ function selectFeed() {
 }
 
 function getArticles(feed) {
-	loadingCard = new UI.Card({status: blackStatusBar});
-	loadingCard.title(" ");
-	loadingCard.subtitle(" ");
-	if (Feature.round()) {
-		loadingCard.body("Loading..."); //This will get centered automatically on the Round.
-	}
-	else {
-		loadingCard.body("        Loading...");
-	}
+	// A plain window with centered text: cards can't center text on rectangular screens.
+	var screen = Feature.resolution();
+	loadingCard = new UI.Window({status: blackStatusBar, backgroundColor: 'white'});
+	loadingCard.add(new UI.Text({
+		position: new Vector2(0, Math.round(screen.y / 2) - 16),
+		size: new Vector2(screen.x, 32),
+		text: "Loading...",
+		font: 'gothic-24-bold',
+		color: 'black',
+		textAlign: 'center'
+	}));
 	loadingCard.show();
 	loadingCardVisible = true;
 	
