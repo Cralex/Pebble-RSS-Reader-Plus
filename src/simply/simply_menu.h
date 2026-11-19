@@ -36,10 +36,33 @@ struct SimplyMenuLayer {
 
 typedef struct SimplyMenu SimplyMenu;
 
+typedef enum SimplyMenuScrollState SimplyMenuScrollState;
+
+enum SimplyMenuScrollState {
+  SimplyMenuScrollIdle = 0,
+  SimplyMenuScrollWaiting,
+  SimplyMenuScrollScrolling,
+  SimplyMenuScrollPaused,
+};
+
+//! Scrolls the highlighted row's title when it's too long to show in full.
+typedef struct SimplyMenuTitleScroll SimplyMenuTitleScroll;
+
+struct SimplyMenuTitleScroll {
+  AppTimer *timer;
+  SimplyMenuScrollState state;
+  MenuIndex index;
+  GSize cell_size;      //!< Size of the highlighted cell when it was last drawn
+  int16_t offset;       //!< How far the title is scrolled, in pixels
+  int16_t max_offset;   //!< Offset that shows the end of the title; 0 if it fits, -1 if unknown
+  uint8_t cycles;
+};
+
 struct SimplyMenu {
   SimplyWindow window;
   SimplyMenuLayer menu_layer;
   AppTimer *spinner_timer;
+  SimplyMenuTitleScroll title_scroll;
 };
 
 typedef struct SimplyMenuCommon SimplyMenuCommon;

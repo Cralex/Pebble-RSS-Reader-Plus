@@ -10,6 +10,7 @@
 #include "util/display.h"
 #include "util/graphics.h"
 #include "util/graphics_text.h"
+#include "util/math.h"
 #include "util/menu_layer.h"
 #include "util/noop.h"
 #include "util/platform.h"
@@ -257,6 +258,199 @@ static void prv_reload_data(SimplyMenu *self) {
   }
 }
 
+// ---- Title scrolling ----
+//
+// When the highlighted row's title is cut off, wait a moment and then scroll it so the whole
+// title can be read: sideways on rectangular displays (one line), upwards on round displays
+// (two wrapped lines). At rest the row is drawn by menu_cell_basic_draw as usual; while
+// scrolling, prv_draw_scrolled_title draws the title in the same place, offset by the scroll.
+// The layout constants mirror the firmware's menu_layer_system_cells.c.
+
+#define TITLE_SCROLL_START_DELAY_MS 1000
+#define TITLE_SCROLL_END_PAUSE_MS 1500
+#define TITLE_SCROLL_FRAME_MS 50
+#define TITLE_SCROLL_STEP PBL_IF_RECT_ELSE(2, 1)
+#define TITLE_SCROLL_CYCLES 3
+
+#define TITLE_FONT_KEY FONT_KEY_GOTHIC_24_BOLD
+#if defined(PBL_PLATFORM_EMERY)
+#define TITLE_RECT_INSET 10
+#else
+#define TITLE_RECT_INSET 5
+#endif
+#define TITLE_ROUND_INSET 16
+// Gothic 24 Bold's cap offset, which the firmware subtracts (measured against its rendering)
+#define TITLE_ROUND_CAP_OFFSET 5
+#define TITLE_TEXT_MAX_EXTENT 4000
+
+static GFont prv_title_font(void) {
+  return fonts_get_system_font(TITLE_FONT_KEY);
+}
+
+static int16_t prv_title_line_height(void) {
+  static int16_t s_height;
+  if (!s_height) {
+    s_height = graphics_text_layout_get_content_size(
+        "Ag", prv_title_font(), GRect(0, 0, 200, 200), GTextOverflowModeWordWrap,
+        GTextAlignmentLeft).h;
+  }
+  return s_height;
+}
+
+static bool prv_title_scroll_applies(const SimplyMenuItem *item) {
+  return (item && item->title && item->title != EMPTY_TITLE && !item->subtitle && !item->icon);
+}
+
+ROUND_USAGE static int16_t prv_round_title_width(GSize cell_size) {
+  return cell_size.w - 2 * TITLE_ROUND_INSET;
+}
+
+//! Height of the title as menu_cell_basic_draw shows it on round: at most two lines.
+ROUND_USAGE static int16_t prv_round_visible_title_height(const char *title, GSize cell_size) {
+  return graphics_text_layout_get_content_size(
+      title, prv_title_font(), GRect(0, 0, prv_round_title_width(cell_size),
+                                     2 * prv_title_line_height()),
+      GTextOverflowModeFill, GTextAlignmentCenter).h;
+}
+
+static int16_t prv_title_max_offset(const char *title, GSize cell_size) {
+#if defined(PBL_ROUND)
+  const int16_t full_height = graphics_text_layout_get_content_size(
+      title, prv_title_font(), GRect(0, 0, prv_round_title_width(cell_size), TITLE_TEXT_MAX_EXTENT),
+      GTextOverflowModeWordWrap, GTextAlignmentCenter).h;
+  return MAX(0, full_height - prv_round_visible_title_height(title, cell_size));
+#else
+  const int16_t width = graphics_text_layout_get_content_size(
+      title, prv_title_font(), GRect(0, 0, TITLE_TEXT_MAX_EXTENT, cell_size.h),
+      GTextOverflowModeWordWrap, GTextAlignmentLeft).w;
+  return MAX(0, width - (cell_size.w - TITLE_RECT_INSET));
+#endif
+}
+
+static void prv_draw_scrolled_title(SimplyMenu *self, GContext *ctx, const Layer *cell_layer,
+                                    const char *title) {
+  const GRect bounds = layer_get_bounds(cell_layer);
+  const int16_t offset = self->title_scroll.offset;
+#if defined(PBL_ROUND)
+  const int16_t visible_height = prv_round_visible_title_height(title, bounds.size);
+  const int16_t top = (bounds.size.h - visible_height) / 2 - TITLE_ROUND_CAP_OFFSET;
+  const GRect box = GRect(TITLE_ROUND_INSET, top - offset,
+                          prv_round_title_width(bounds.size), TITLE_TEXT_MAX_EXTENT);
+  graphics_draw_text(ctx, title, prv_title_font(), box, GTextOverflowModeWordWrap,
+                     GTextAlignmentCenter, NULL);
+  // Only show the two lines' worth of space the title normally gets: cover lines scrolling
+  // in or out above and below it with the highlight color.
+  graphics_context_set_fill_color(ctx, gcolor8_get_or(self->menu_layer.highlight_background,
+                                                      GColorBlack));
+  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, top), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(0, top + visible_height, bounds.size.w,
+                                bounds.size.h - top - visible_height), 0, GCornerNone);
+#else
+  const int16_t line_height = prv_title_line_height();
+  const GRect box = GRect(TITLE_RECT_INSET - offset, (bounds.size.h - (line_height + 10)) / 2,
+                          TITLE_TEXT_MAX_EXTENT, line_height + 4);
+  graphics_draw_text(ctx, title, prv_title_font(), box, GTextOverflowModeWordWrap,
+                     GTextAlignmentLeft, NULL);
+#endif
+}
+
+static void prv_title_scroll_timer_callback(void *data);
+
+static void prv_title_scroll_schedule(SimplyMenu *self, SimplyMenuScrollState state,
+                                      uint32_t delay_ms) {
+  SimplyMenuTitleScroll *scroll = &self->title_scroll;
+  if (scroll->timer) {
+    app_timer_cancel(scroll->timer);
+  }
+  scroll->state = state;
+  scroll->timer = app_timer_register(delay_ms, prv_title_scroll_timer_callback, self);
+}
+
+static void prv_title_scroll_stop(SimplyMenu *self) {
+  SimplyMenuTitleScroll *scroll = &self->title_scroll;
+  if (scroll->timer) {
+    app_timer_cancel(scroll->timer);
+    scroll->timer = NULL;
+  }
+  scroll->state = SimplyMenuScrollIdle;
+  if (scroll->offset) {
+    scroll->offset = 0;
+    prv_mark_dirty(self);
+  }
+}
+
+//! Start over for the currently highlighted row.
+static void prv_title_scroll_reset(SimplyMenu *self) {
+  prv_title_scroll_stop(self);
+  SimplyMenuTitleScroll *scroll = &self->title_scroll;
+  scroll->max_offset = -1;
+  scroll->cycles = 0;
+  if (self->menu_layer.menu_layer) {
+    scroll->index = menu_layer_get_selected_index(self->menu_layer.menu_layer);
+    prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, TITLE_SCROLL_START_DELAY_MS);
+  }
+}
+
+static void prv_title_scroll_timer_callback(void *data) {
+  SimplyMenu *self = data;
+  SimplyMenuTitleScroll *scroll = &self->title_scroll;
+  scroll->timer = NULL;
+  if (!self->menu_layer.menu_layer) {
+    scroll->state = SimplyMenuScrollIdle;
+    return;
+  }
+
+  switch (scroll->state) {
+    case SimplyMenuScrollWaiting: {
+      SimplyMenuItem *item = prv_get_menu_item(self, scroll->index.section, scroll->index.row);
+      if (!item || !item->title || scroll->cell_size.w == 0) {
+        // Not loaded or drawn yet: check again later.
+        prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, TITLE_SCROLL_START_DELAY_MS);
+        return;
+      }
+      if (!prv_title_scroll_applies(item)) {
+        scroll->state = SimplyMenuScrollIdle;
+        return;
+      }
+      if (scroll->max_offset < 0) {
+        scroll->max_offset = prv_title_max_offset(item->title, scroll->cell_size);
+      }
+      if (scroll->max_offset == 0) {
+        scroll->state = SimplyMenuScrollIdle; // It fits.
+        return;
+      }
+      prv_title_scroll_schedule(self, SimplyMenuScrollScrolling, TITLE_SCROLL_FRAME_MS);
+      return;
+    }
+    case SimplyMenuScrollScrolling:
+      scroll->offset = MIN(scroll->offset + TITLE_SCROLL_STEP, scroll->max_offset);
+      if (scroll->offset >= scroll->max_offset) {
+        prv_title_scroll_schedule(self, SimplyMenuScrollPaused, TITLE_SCROLL_END_PAUSE_MS);
+      } else {
+        prv_title_scroll_schedule(self, SimplyMenuScrollScrolling, TITLE_SCROLL_FRAME_MS);
+      }
+      prv_mark_dirty(self);
+      return;
+    case SimplyMenuScrollPaused:
+      scroll->offset = 0;
+      prv_mark_dirty(self);
+      if (++scroll->cycles < TITLE_SCROLL_CYCLES) {
+        prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, TITLE_SCROLL_START_DELAY_MS);
+      } else {
+        scroll->state = SimplyMenuScrollIdle;
+      }
+      return;
+    case SimplyMenuScrollIdle:
+      return;
+  }
+}
+
+static bool prv_title_scroll_is_showing(SimplyMenu *self, const MenuIndex *cell_index) {
+  const SimplyMenuTitleScroll *scroll = &self->title_scroll;
+  return (scroll->offset > 0 && scroll->index.section == cell_index->section &&
+          scroll->index.row == cell_index->row);
+}
+
 static void simply_menu_set_num_sections(SimplyMenu *self, uint16_t num_sections) {
   if (num_sections == 0) {
     num_sections = 1;
@@ -279,6 +473,10 @@ static void simply_menu_add_item(SimplyMenu *self, SimplyMenuItem *item) {
   }
   prv_add_item(self, item);
   prv_mark_dirty(self);
+  if (item->section == self->title_scroll.index.section &&
+      item->item == self->title_scroll.index.row) {
+    prv_title_scroll_reset(self); // The highlighted row's title changed.
+  }
 }
 
 static MenuIndex simply_menu_get_selection(SimplyMenu *self) {
@@ -438,6 +636,14 @@ static void prv_menu_draw_row_callback(GContext *ctx, const Layer *cell_layer,
   list1_remove(&self->menu_layer.items, &item->node);
   list1_prepend(&self->menu_layer.items, &item->node);
 
+  if (menu_cell_layer_is_highlighted(cell_layer)) {
+    self->title_scroll.cell_size = layer_get_bounds(cell_layer).size;
+    if (prv_title_scroll_is_showing(self, cell_index) && prv_title_scroll_applies(item)) {
+      prv_draw_scrolled_title(self, ctx, cell_layer, item->title);
+      return;
+    }
+  }
+
   SimplyImage *image = simply_res_get_image(self->window.simply->res, item->icon);
   GColor8 *palette = NULL;
 
@@ -454,6 +660,11 @@ static void prv_menu_draw_row_callback(GContext *ctx, const Layer *cell_layer,
   if (palette) {
     gbitmap_set_palette(image->bitmap, palette, false);
   }
+}
+
+static void prv_menu_selection_changed_callback(MenuLayer *menu_layer, MenuIndex new_index,
+                                                MenuIndex old_index, void *data) {
+  prv_title_scroll_reset(data);
 }
 
 static void prv_menu_select_click_callback(MenuLayer *menu_layer, MenuIndex *cell_index,
@@ -517,6 +728,7 @@ static void prv_menu_window_load(Window *window) {
     .draw_row = prv_menu_draw_row_callback,
     .select_click = prv_menu_select_click_callback,
     .select_long_click = prv_menu_select_long_click_callback,
+    .selection_changed = prv_menu_selection_changed_callback,
   });
 
   menu_layer_set_click_config_provider_onto_window(menu_layer, prv_click_config_provider, window);
@@ -525,10 +737,12 @@ static void prv_menu_window_load(Window *window) {
 static void prv_menu_window_appear(Window *window) {
   SimplyMenu *self = window_get_user_data(window);
   simply_window_appear(&self->window);
+  prv_title_scroll_reset(self);
 }
 
 static void prv_menu_window_disappear(Window *window) {
   SimplyMenu *self = window_get_user_data(window);
+  prv_title_scroll_stop(self);
   if (simply_window_disappear(&self->window)) {
     simply_res_clear(self->window.simply->res);
     simply_menu_clear(self);
@@ -538,6 +752,7 @@ static void prv_menu_window_disappear(Window *window) {
 static void prv_menu_window_unload(Window *window) {
   SimplyMenu *self = window_get_user_data(window);
 
+  prv_title_scroll_stop(self);
   menu_layer_destroy(self->menu_layer.menu_layer);
   // window.layer points at the menu layer's base layer; clear it too, as simply_ui and
   // simply_stage do, or the next window update calls layer_mark_dirty on freed memory.
@@ -565,6 +780,8 @@ static void simply_menu_clear(SimplyMenu *self) {
     prv_destroy_item(self, (SimplyMenuItem *)self->menu_layer.items);
   }
 
+  prv_title_scroll_stop(self);
+  self->title_scroll.max_offset = -1;
   prv_reload_data(self);
 }
 
@@ -699,6 +916,7 @@ void simply_menu_destroy(SimplyMenu *self) {
     return;
   }
 
+  prv_title_scroll_stop(self);
   simply_window_deinit(&self->window);
 
   free(self);
