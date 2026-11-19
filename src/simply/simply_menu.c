@@ -539,7 +539,10 @@ static void prv_menu_window_unload(Window *window) {
   SimplyMenu *self = window_get_user_data(window);
 
   menu_layer_destroy(self->menu_layer.menu_layer);
+  // window.layer points at the menu layer's base layer; clear it too, as simply_ui and
+  // simply_stage do, or the next window update calls layer_mark_dirty on freed memory.
   self->menu_layer.menu_layer = NULL;
+  self->window.layer = NULL;
 
   simply_window_unload(&self->window);
 }
