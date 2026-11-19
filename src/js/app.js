@@ -10,6 +10,18 @@ var Vector2 = require('vector2');
 // The whole article list is saved to phone storage while reading, so keep it bounded.
 var MAX_ARTICLES = 50;
 
+// Article text is split into a first page, which scrolls, and paragraphs. Later pages show as
+// much of one paragraph as the watch can fit: the watch measures it (see the card's `fit`
+// property) and reports how much it showed, so pages suit each watch's screen and fonts.
+// (Declared up here because a saved article is reopened before the rest of this file runs.)
+var FIRST_PAGE_MAX_CHARS = 1800; // PebbleJS misbehaves as a page nears ~2,000 characters.
+var PAGE_CANDIDATE_MAX_CHARS = 600; // More than any watch can show on one page.
+var NBSP = String.fromCharCode(160);
+var CONTINUED_MARK = "‹" + NBSP; // Starts a page that continues a paragraph.
+var FIRST_PAGE = { unit: -1, offset: 0 };
+var END_OF_ARTICLE = null;
+var lastFitId = 0;
+
 var blackStatusBar = {
 	color: "white",
 	backgroundColor: "black",
@@ -75,28 +87,35 @@ if (typeof Settings.data('welcomeScreenCompleted') === 'undefined') {
 }
 else {
 	if (allSavedInfoExists()) {
-		displayArticlePage(Settings.data('savedArticleList'), Settings.data('savedArticleNum'), Settings.data('savedPageNum'));
+		displayArticlePage(Settings.data('savedArticleList'), Settings.data('savedArticleNum'), Settings.data('savedPage'), Settings.data('savedPageHistory') || []);
 	}
 }
 
 function removeSavedInfo() {
 	Settings.data('savedArticleList', undefined);
 	Settings.data('savedArticleNum', undefined);
-	Settings.data('savedPageNum', undefined);
+	Settings.data('savedPage', undefined);
+	Settings.data('savedPageHistory', undefined);
+	Settings.data('savedPageNum', undefined); // Saved by older versions
 	//savedFeed is NOT removed!
 }
 function allSavedInfoExists() {
-	if (typeof Settings.data('savedFeed') === 'undefined' || typeof Settings.data('savedArticleList') === 'undefined' || typeof Settings.data('savedArticleNum') === 'undefined' || typeof Settings.data('savedPageNum') === 'undefined') {
+	var list = Settings.data('savedArticleList');
+	var num = Settings.data('savedArticleNum');
+	var page = Settings.data('savedPage');
+	if (typeof Settings.data('savedFeed') === 'undefined' || !Array.isArray(list) || typeof num !== 'number' || !page) {
 		return false;
 	}
-	else {
-		return true;
-	}
+	// Older versions saved articles in a different form; don't try to reopen those.
+	var article = list[num];
+	return Boolean(article && article.text && Array.isArray(article.text.units) &&
+		page.unit < article.text.units.length);
 }
-function saveCurrPage(articleCard, articleList, articleNum, pageNum) {
+function saveCurrPage(articleCard, articleList, articleNum, page, history) {
 		Settings.data('savedArticleList', articleList);
 		Settings.data('savedArticleNum', articleNum);
-		Settings.data('savedPageNum', pageNum);
+		Settings.data('savedPage', page);
+		Settings.data('savedPageHistory', history);
 		lastSeenArticleCard = articleCard;
 }
 
@@ -181,7 +200,7 @@ function getArticles(feed) {
 			articleList.push({
 				title: formatText(item.title),
 				author: formatText(item.author),
-				pages: makePages(item.content)
+				text: makeArticleText(item.content)
 			});
 		});
 		if (loadingCardVisible) {
@@ -197,74 +216,70 @@ function getArticles(feed) {
 	});
 }
 
-function makePages(content) {
-	paragraphs = content.split(/<\/p>|<br>|[\r\n\t\f\v]+/gim);
-	for (paragraphNum = 0; paragraphNum < paragraphs.length; paragraphNum++) {
-		paragraphs[paragraphNum] = formatText(paragraphs[paragraphNum]);
-	}
-	paragraphs = paragraphs.filter(Boolean); //remove empty strings from array
 
-	pages = [];
-	for (paragraphNum = 0; paragraphNum < paragraphs.length; paragraphNum++) {
-		if (paragraphNum === 0) {
-			// The first page is allowed be much longer. However, PebbleJS exhibits odd behavior once page length nears ~2,000 characters.
-			pages = splitTextCleanly(pages, 1800, 0, true, paragraphs[paragraphNum]);
-		}
-		else {
-			if (! Feature.round()) {
-				// Whatever number you choose for maxCharsPerPage will never be ideal for all pages, due to line wrapping and variable width characters.
-				pages = splitTextCleanly(pages, 80, 45, true, paragraphs[paragraphNum]);
+function makeArticleText(content) {
+	var paragraphs = String(content || "").split(/<\/p>|<br>|[\r\n\t\f\v]+/gim);
+	paragraphs = paragraphs.map(formatText).filter(Boolean); //remove empty strings
+
+	var first = "";
+	var units = [];
+	if (paragraphs.length > 0) {
+		first = paragraphs[0];
+		if (first.length > FIRST_PAGE_MAX_CHARS) {
+			var cut = first.lastIndexOf(" ", FIRST_PAGE_MAX_CHARS);
+			if (cut <= 0) {
+				cut = FIRST_PAGE_MAX_CHARS;
 			}
-			else {
-				// Time round cannot display as many characters.
-				pages = splitTextCleanly(pages, 72, 0, true, paragraphs[paragraphNum]);
-			}
+			units.push(CONTINUED_MARK + first.substring(cut).replace(/^ +/, ""));
+			first = first.substring(0, cut) + NBSP + "›";
 		}
+		units = units.concat(paragraphs.slice(1));
 	}
-	if (pages.length === 0) {
-		pages.push(""); // Headline-only item: show the title with an empty body.
-	}
-	return pages;
+	return { first: first, units: units };
 }
 
-function splitTextCleanly(pageArr, maxCharsPerPage, maxCharsExtension, includeContinuedIndicator, content) {
-	firstPart = content.substring(0, maxCharsPerPage);
-	laterPart = content.substring(maxCharsPerPage);
-
-	if (laterPart.length > maxCharsExtension) { //maxCharsExtension prevents short widow pages at the end of paragraphs, at cost of more font shrinkage.
-
-		//Prevent page split from occurring mid-word.
-		firstPart = firstPart.split(' ');
-		if (firstPart.length > 1) { //If firstPart contains a space.
-			afterLastSpace = firstPart[ firstPart.length - 1 ];
-			laterPart = afterLastSpace + laterPart;
-			firstPart.pop(); //remove afterLastSpace from firstPart
-			firstPart = firstPart.join(' ');
-	
-			if (includeContinuedIndicator) {
-				firstPart = firstPart + String.fromCharCode(160) + "›"; // CharCode 160 is a nonbreaking space.
-				laterPart = "‹" + String.fromCharCode(160) + laterPart;
-			}
-		}
-		else {
-			//There are no spaces.
-			if (includeContinuedIndicator) {
-				firstPart = firstPart[0] + "…";
-				laterPart = "…" + laterPart;
-			}
-			else {
-				firstPart = firstPart[0];
-			}
-		}
-		pageArr.push(firstPart);
-		pageArr.concat(splitTextCleanly(pageArr, maxCharsPerPage, maxCharsExtension, includeContinuedIndicator, laterPart));
+/* How many characters of text are in its first `bytes` bytes of UTF-8 (as the watch counts). */
+function charsInUtf8Prefix(text, bytes) {
+	var utf8 = unescape(encodeURIComponent(text));
+	try {
+		return decodeURIComponent(escape(utf8.substring(0, bytes))).length;
 	}
-  	else {
-  		pageArr.push(content);
-    }
-    return pageArr;
+	catch (e) {
+		return text.length; // Not at a character boundary; shouldn't happen.
+	}
 }
 
+/* The page after one that showed `shown` characters of its paragraph from `page.offset`. */
+function pageAfter(articleText, page, shown) {
+	var text = articleText.units[page.unit];
+	var offset = page.offset + shown;
+	while (text.charAt(offset) === " ") {
+		offset++;
+	}
+	if (offset < text.length) {
+		return { unit: page.unit, offset: offset };
+	}
+	if (page.unit + 1 < articleText.units.length) {
+		return { unit: page.unit + 1, offset: 0 };
+	}
+	return END_OF_ARTICLE;
+}
+
+/* Where "back" goes from a page when there's no history (e.g. after reopening the app). */
+function pageBefore(page) {
+	if (page.offset > 0) {
+		return { unit: page.unit, offset: 0 };
+	}
+	if (page.unit > 0) {
+		return { unit: page.unit - 1, offset: 0 };
+	}
+	return FIRST_PAGE;
+}
+
+function nextFitId() {
+	lastFitId = (lastFitId % 65535) + 1; // 1..65535; 0 means "no fit"
+	return lastFitId;
+}
 
 function formatText(text) {
 	if(!text) {
@@ -342,7 +357,7 @@ function selectArticle(articleList, heading) {
 	removeSavedInfo();
 
 	articleSelectMenu.on("select", function(e) {
-		displayArticlePage(articleList, e.itemIndex, 0);
+		displayArticlePage(articleList, e.itemIndex, FIRST_PAGE, []);
 	});
 	articleSelectMenu.on("longSelect", function() {
 		if (Object.keys(lastSeenArticleCard).length !== 0) {
@@ -359,13 +374,21 @@ function selectArticle(articleList, heading) {
 	});
 }
 
-function displayArticlePage(articleList, articleNum, pageNum) {
-	article = articleList[articleNum];
-	articleCard = new UI.Card({status: blackStatusBar});
-	if (pageNum === 0) {
+/*
+ * Show a page of an article: FIRST_PAGE (title, author and the start of the text, scrolling),
+ * or { unit, offset }: paragraph `unit` from character `offset`, as much as the watch fits.
+ * `history` is the pages before this one, for going back.
+ */
+function displayArticlePage(articleList, articleNum, page, history) {
+	var article = articleList[articleNum];
+	var text = article.text;
+	var articleCard = new UI.Card({status: blackStatusBar});
+	var nextPage; // undefined until known; END_OF_ARTICLE (null) after the last page
+
+	if (page.unit < 0) {
 		articleCard.scrollable(true);
 		articleCard.title(article.title);
-		if (article.author && article.pages[0].indexOf(article.author) === -1) { //If the article has an author which isn't repeated in the first page of the body
+		if (article.author && text.first.indexOf(article.author) === -1) { //If the article has an author which isn't repeated in the first page of the body
 			if (article.author.lastIndexOf("by ") === 0) { //If the article's author string starts with "by "
 				articleCard.subtitle(article.author);
 			}
@@ -373,74 +396,83 @@ function displayArticlePage(articleList, articleNum, pageNum) {
 				articleCard.subtitle("by " + article.author);
 			}
 		}
-		articleCard.body(article.pages[pageNum]);
-		if (pageNum < article.pages.length - 1) {
-			articleCard.action({
-				up: 'images/action_up.png',
-				select: "images/action_next.png",
-				down: 'images/action_down.png'
-			});
-		}
-		else {
-			articleCard.action({
-				up: 'images/action_up.png',
-				select: "images/action_check.png",
-				down: 'images/action_down.png'
-			});
-		}
+		articleCard.body(text.first);
+		nextPage = text.units.length > 0 ? { unit: 0, offset: 0 } : END_OF_ARTICLE;
+		articleCard.action({
+			up: 'images/action_up.png',
+			select: nextPage ? "images/action_next.png" : "images/action_check.png",
+			down: 'images/action_down.png'
+		});
 	}
 	else {
+		var rest = text.units[page.unit].substring(page.offset);
+		var prefix = page.offset > 0 ? CONTINUED_MARK : "";
+		var isParagraphEnd = rest.length <= PAGE_CANDIDATE_MAX_CHARS;
+		var candidate = rest;
+		if (!isParagraphEnd) {
+			var cut = rest.lastIndexOf(" ", PAGE_CANDIDATE_MAX_CHARS);
+			candidate = rest.substring(0, cut > 0 ? cut : PAGE_CANDIDATE_MAX_CHARS);
+		}
+		var body = prefix + candidate;
+		var fitId = nextFitId();
 		articleCard.scrollable(false);
-		articleCard.body(article.pages[pageNum]);
+		articleCard.body(body);
 		articleCard.action(false);
+		articleCard.fit({ mode: isParagraphEnd ? 'end' : 'page', id: fitId });
+		articleCard.on('fit', function(e) {
+			if (e.id !== fitId) {
+				return;
+			}
+			var shown = charsInUtf8Prefix(body, e.length) - prefix.length;
+			if (shown <= 0) {
+				shown = candidate.length; // Always make progress.
+			}
+			nextPage = pageAfter(text, page, shown);
+		});
 	}
 
 	articleCard.show();
-	
-	saveCurrPage(articleCard, articleList, articleNum, pageNum);
+
+	saveCurrPage(articleCard, articleList, articleNum, page, history);
 	articleCard.on('show', function() {
-		saveCurrPage(articleCard, articleList, articleNum, pageNum);
+		saveCurrPage(articleCard, articleList, articleNum, page, history);
 	});
+
+	function backToArticleList(selectNext) {
+		if (articleSelectMenuExists) {
+			articleSelectMenu.show();
+			articleSelectMenu.selection(0, articleNum + (selectNext ? 1 : 0)); //Note: will leave wrong story selected if feed was updated since article was saved.
+		}
+		else {
+			getArticles(Settings.data('savedFeed'));
+		}
+	}
 
 	articleCard.on('click', function(e) {
 		if (e.button === 'select' || e.button === 'down') {
-			if (pageNum < article.pages.length - 1) {
-				displayArticlePage(articleList, articleNum, pageNum + 1);
+			if (nextPage === undefined) {
+				return; // The watch hasn't said where this page ends yet.
+			}
+			if (nextPage) {
+				displayArticlePage(articleList, articleNum, nextPage, history.concat([page]));
 			}
 			else {
-				if (articleSelectMenuExists) {
-					articleSelectMenu.show();
-					articleSelectMenu.selection(0, articleNum + 1); //Note: will leave wrong story selected if feed was updated since article was saved.
-				}
-				else {
-					getArticles(Settings.data('savedFeed'));
-				}
+				backToArticleList(true);
 			}
 		}
 		if (e.button === 'up' || e.button === 'back') {
-			if (pageNum > 0) {
-				displayArticlePage(articleList, articleNum, pageNum - 1);
+			if (page.unit >= 0) {
+				var previous = history.length > 0 ? history[history.length - 1] : pageBefore(page);
+				displayArticlePage(articleList, articleNum, previous, history.slice(0, -1));
 			}
 			else {
-				if (articleSelectMenuExists) {
-					articleSelectMenu.show();
-					articleSelectMenu.selection(0, articleNum); //Note: will leave wrong story selected if feed was updated since article was saved.
-				}
-				else {
-					getArticles(Settings.data('savedFeed'));
-				}
+				backToArticleList(false);
 			}
 		}
 		this.hide();
 	});
 	articleCard.on('longClick', 'select', function() {
-		if (articleSelectMenuExists) {
-			articleSelectMenu.show();
-			articleSelectMenu.selection(0, articleNum); //Note: will leave wrong story selected if feed was updated since article was saved.
-		}
-		else {
-			getArticles(Settings.data('savedFeed'));	
-		}
+		backToArticleList(false);
 		this.hide();
 	});
 	

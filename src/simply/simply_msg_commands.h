@@ -58,5 +58,7 @@ enum Command {
   CommandVoiceStart,
   CommandVoiceStop,
   CommandVoiceData,
+  CommandCardFit,
+  CommandCardFitEvent,
   NumCommands,
 };
