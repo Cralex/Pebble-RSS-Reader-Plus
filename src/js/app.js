@@ -21,9 +21,6 @@ var defaultFeeds = [{
 	title: "The Atlantic",
 	url: "https://www.theatlantic.com/feed/all"
 	},{
-	title: "Vice News",
-	url: "http://news.vice.com/rss"
-	},{
 	title: "Time Magazine",
 	url: "https://time.com/feed/"
 	},{
@@ -38,9 +35,6 @@ var defaultFeeds = [{
 	},{
 	title: "SBNation",
 	url: "https://www.sbnation.com/rss/index.xml"
-	},{
-	title: "Curbed",
-	url: "https://www.curbed.com/rss/full.xml"
 	}];
 
 Settings.config({url: 'https://wowfunhappy.github.io/Pebble-RSS-Reader/', hash: true}, function(){
