@@ -32,6 +32,7 @@ struct SimplyMenuLayer {
   GColor8 normal_background;
   GColor8 highlight_foreground;
   GColor8 highlight_background;
+  bool wrap; //!< Whether up/down wrap around at the ends of the menu
 };
 
 typedef struct SimplyMenu SimplyMenu;
