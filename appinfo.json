@@ -3,8 +3,8 @@
   "capabilities": [
     "configurable"
   ],
-  "companyName": "Jonathan Alland",
-  "longName": "RSS Reader",
+  "companyName": "Cralex",
+  "longName": "RSS Reader Plus",
   "resources": {
     "media": [
       {
@@ -46,7 +46,7 @@
     ]
   },
   "sdkVersion": "3",
-  "shortName": "RSS Reader",
+  "shortName": "RSS Reader +",
   "targetPlatforms": [
     "aplite",
     "basalt",
@@ -57,7 +57,7 @@
   "usesPermissions": [
     "Internet"
   ],
-  "uuid": "f7db208c-a80b-4bca-b5fd-813f02c5570f",
+  "uuid": "2884a4ea-6a0d-4945-a91b-18f826f1f78f",
   "versionCode": 1,
   "versionLabel": "2.0",
   "watchapp": {
