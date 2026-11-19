@@ -4,7 +4,7 @@
     "configurable"
   ],
   "companyName": "Cralex",
-  "longName": "RSS Reader Plus",
+  "longName": "RSS Reader+",
   "resources": {
     "media": [
       {
@@ -46,7 +46,7 @@
     ]
   },
   "sdkVersion": "3",
-  "shortName": "RSS Reader +",
+  "shortName": "RSS Reader+",
   "targetPlatforms": [
     "aplite",
     "basalt",

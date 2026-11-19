@@ -1,14 +1,14 @@
 ![Banner](Banner.png)
 
-# RSS Reader Plus
+# RSS Reader+
 
 Hands full? No problem! As long as you have a Pebble smartwatch and at least one free finger, you can read the news—no pulling out your phone required.
 
-_RSS Reader Plus_ (shown on the watch as _RSS Reader +_) lets you read complete news articles, blog posts, or anything else with an RSS or Atom feed on your Pebble smartwatch. An unlimited number of feeds are supported, as are articles of any length. Peruse the default feeds, or add your own in Settings.
+_RSS Reader+_ lets you read complete news articles, blog posts, or anything else with an RSS or Atom feed on your Pebble smartwatch. An unlimited number of feeds are supported, as are articles of any length. Peruse the default feeds, or add your own in Settings.
 
 ## What's new compared to Pebble RSS Reader
 
-RSS Reader Plus is a continuation of [Pebble RSS Reader](https://github.com/Wowfunhappy/Pebble-RSS-Reader) by Jonathan Alland (Wowfunhappy), which hasn't been updated in years.
+RSS Reader+ is a continuation of [Pebble RSS Reader](https://github.com/Wowfunhappy/Pebble-RSS-Reader) by Jonathan Alland (Wowfunhappy), which hasn't been updated in years.
 
 - Builds with the current Pebble SDK and works with the current Pebble phone app.
 - Feeds are downloaded and read directly on your phone, with no third-party service in between (so no rss2json account or rate limits).
