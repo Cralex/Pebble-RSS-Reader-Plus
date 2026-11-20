@@ -23,7 +23,9 @@
 #define SEND_DELAY_MS 10
 
 static const size_t APP_MSG_SIZE_INBOUND = IF_APLITE_ELSE(1024, 2044);
-static const size_t APP_MSG_SIZE_OUTBOUND = 1024;
+// Messages to the phone are small (clicks, menu requests, page-fit reports); aplite's heap can't
+// spare a large buffer for them. Voice dictation, the only big one, doesn't exist on aplite.
+static const size_t APP_MSG_SIZE_OUTBOUND = IF_APLITE_ELSE(256, 1024);
 
 typedef enum VibeType VibeType;
 
