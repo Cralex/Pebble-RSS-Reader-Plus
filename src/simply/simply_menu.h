@@ -33,6 +33,16 @@ struct SimplyMenuLayer {
   GColor8 highlight_foreground;
   GColor8 highlight_background;
   bool wrap; //!< Whether up/down wrap around at the ends of the menu
+  uint8_t title_scroll_mode; //!< SimplyMenuTitleScrollMode for long titles in this menu
+};
+
+typedef enum SimplyMenuTitleScrollMode SimplyMenuTitleScrollMode;
+
+//! How the highlighted row's title scrolls when it's too long to show.
+enum SimplyMenuTitleScrollMode {
+  SimplyMenuTitleScrollOff = 0,
+  SimplyMenuTitleScrollQuick,   //!< Start after 1 s; pause 1.5 s at the end
+  SimplyMenuTitleScrollRelaxed, //!< Start after 2 s; pause 2.5 s at the end
 };
 
 typedef struct SimplyMenu SimplyMenu;

@@ -580,6 +580,14 @@ var MenuClearSectionPacket = new struct([
   ['uint16', 'section'],
 ]);
 
+// How long titles scroll in the highlighted row: 'off', 'quick' or 'relaxed'.
+var TitleScrollTypes = ['off', 'quick', 'relaxed'];
+
+var TitleScrollType = function(x) {
+  var index = TitleScrollTypes.indexOf(x);
+  return index === -1 ? 1 : index;
+};
+
 var MenuPropsPacket = new struct([
   [Packet, 'packet'],
   ['uint16', 'sections', EnumerableType],
@@ -588,6 +596,7 @@ var MenuPropsPacket = new struct([
   ['uint8', 'highlightBackgroundColor', ColorType],
   ['uint8', 'highlightTextColor', ColorType],
   ['bool', 'wrap', BoolType],
+  ['uint8', 'titleScroll', TitleScrollType],
 ]);
 
 var MenuSectionPacket = new struct([

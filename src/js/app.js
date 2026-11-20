@@ -56,13 +56,15 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 	var savedFeeds = Settings.option().feeds;
 	return configPage.url({
 		feeds: savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds,
-		wrapFeedList: wrapFeedList()
+		wrapFeedList: wrapFeedList(),
+		titleScroll: titleScroll()
 	});
 }, function(e){
 	if (!e.failed && e.options) {
 		var saved = configPage.settingsFromResponse(e.options);
 		Settings.option("feeds", saved.feeds);
 		Settings.option("wrapFeedList", saved.wrapFeedList);
+		Settings.option("titleScroll", saved.titleScroll);
 	}
 	feedSelectMenu.hide(); // Will likely close app
 });
@@ -70,6 +72,12 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 /* Whether up/down wrap around at the ends of the feed list (a setting; on by default). */
 function wrapFeedList() {
 	return Settings.option("wrapFeedList") !== false;
+}
+
+/* How long titles scroll in menus: 'relaxed' (default), 'quick' or 'off' (a setting). */
+function titleScroll() {
+	var mode = Settings.option("titleScroll");
+	return (mode === 'quick' || mode === 'off') ? mode : 'relaxed';
 }
 
 /*-----------------------------------------------------------------------------*/
@@ -132,6 +140,7 @@ function selectFeed() {
 	feedSelectMenu = new UI.Menu({
 		status: false,
 		wrap: wrapFeedList(),
+		titleScroll: titleScroll(),
 		sections: [{
 			title: "Select Feed:",
 			items: feeds
@@ -346,6 +355,7 @@ function selectArticle(articleList, heading) {
 
 	articleSelectMenu = new UI.Menu({
 		status: false,
+		titleScroll: titleScroll(),
 		sections: [{
 			title: heading,
 			items: articleList
