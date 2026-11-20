@@ -110,11 +110,13 @@ static void simply_menu_set_selection(SimplyMenu *self, MenuIndex menu_index, Me
 static void refresh_spinner_timer(SimplyMenu *self);
 
 
-static int64_t prv_get_milliseconds(void) {
+//! Milliseconds, wrapping every ~49 days: only used for the spinner's phase. (32-bit, because
+//! 64-bit division pulls in ~750 bytes of library code, which aplite can't spare.)
+static uint32_t prv_get_milliseconds(void) {
   time_t now_s;
   uint16_t now_ms_part;
   time_ms(&now_s, &now_ms_part);
-  return ((int64_t) now_s) * 1000 + now_ms_part;
+  return ((uint32_t) now_s) * 1000 + now_ms_part;
 }
 
 static bool prv_send_menu_item(Command type, uint16_t section, uint16_t item) {
@@ -616,7 +618,7 @@ static void simply_menu_draw_row_spinner(SimplyMenu *self, GContext *ctx,
   const int16_t num_lines = 16;
   const int16_t num_drawn_lines = 3;
 
-  const int64_t now_ms = prv_get_milliseconds();
+  const uint32_t now_ms = prv_get_milliseconds();
   const uint32_t start_index = (now_ms / SPINNER_MS) % num_lines;
 
   graphics_context_set_antialiased(ctx, true);
