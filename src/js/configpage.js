@@ -92,6 +92,17 @@ function buildConfig(slotCount) {
 		label: 'Wrap around the feed list',
 		description: 'Pressing up on the first feed goes to the last one, and down on the last goes to the first.',
 		defaultValue: true
+	}, {
+		type: 'radiogroup',
+		messageKey: 'titleScroll',
+		label: 'Scroll long titles',
+		description: 'How the highlighted title in a list scrolls when it\'s too long to show in full.',
+		defaultValue: 'relaxed',
+		options: [
+			{ label: 'Relaxed: wait 2 seconds before scrolling, and pause at the end', value: 'relaxed' },
+			{ label: 'Quick: start after 1 second', value: 'quick' },
+			{ label: 'Off', value: 'off' }
+		]
 	}];
 
 	return [{
@@ -323,11 +334,18 @@ function feedKey(url) {
 	return String(url).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
 
-/* A data: URL for the settings page, filled in with the given settings ({ feeds, wrapFeedList }). */
+/*
+ * A data: URL for the settings page, filled in with the given settings
+ * ({ feeds, wrapFeedList, titleScroll }).
+ */
 function url(settings) {
 	var feeds = settings.feeds;
 	var slotCount = Math.max(MIN_SLOTS, feeds.length + SPARE_SLOTS);
-	var values = { opmlImport: '', wrapFeedList: settings.wrapFeedList };
+	var values = {
+		opmlImport: '',
+		wrapFeedList: settings.wrapFeedList,
+		titleScroll: settings.titleScroll
+	};
 	for (var i = 1; i <= slotCount; i++) {
 		var feed = feeds[i - 1];
 		values['feedName' + i] = feed ? feed.title : '';
@@ -340,14 +358,16 @@ function url(settings) {
 
 /*
  * The settings in the page's response (Clay's { feedName1: { value: ... } } object):
- * { feeds, wrapFeedList }. The feeds are the slots in order, then any imported feeds whose
+ * { feeds, wrapFeedList, titleScroll }. The feeds are the slots in order, then any imported feeds whose
  * URLs aren't already in the list.
  */
 function settingsFromResponse(response) {
 	var wrap = response.wrapFeedList;
+	var scroll = response.titleScroll && response.titleScroll.value;
 	return {
 		feeds: feedsFromResponse(response),
-		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true
+		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true,
+		titleScroll: (scroll === 'quick' || scroll === 'off') ? scroll : 'relaxed'
 	};
 }
 

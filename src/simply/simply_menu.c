@@ -45,6 +45,7 @@ struct __attribute__((__packed__)) MenuPropsPacket {
   GColor8 highlight_background_color;
   GColor8 highlight_text_color;
   bool wrap;
+  uint8_t title_scroll_mode;
 };
 
 typedef struct MenuSectionPacket MenuSectionPacket;
@@ -267,11 +268,13 @@ static void prv_reload_data(SimplyMenu *self) {
 // scrolling, prv_draw_scrolled_title draws the title in the same place, offset by the scroll.
 // The layout constants mirror the firmware's menu_layer_system_cells.c.
 
+// Quick timings; Relaxed adds TITLE_SCROLL_RELAXED_EXTRA_MS to both.
 #define TITLE_SCROLL_START_DELAY_MS 1000
 #define TITLE_SCROLL_END_PAUSE_MS 1500
+#define TITLE_SCROLL_RELAXED_EXTRA_MS 1000
 #define TITLE_SCROLL_FRAME_MS 50
 #define TITLE_SCROLL_STEP PBL_IF_RECT_ELSE(2, 1)
-#define TITLE_SCROLL_CYCLES 3
+#define TITLE_SCROLL_CYCLES 2
 
 #define TITLE_FONT_KEY FONT_KEY_GOTHIC_24_BOLD
 #if defined(PBL_PLATFORM_EMERY)
@@ -364,6 +367,18 @@ static void prv_draw_scrolled_title(SimplyMenu *self, GContext *ctx, const Layer
 
 static void prv_title_scroll_timer_callback(void *data);
 
+static uint32_t prv_title_scroll_start_delay(SimplyMenu *self) {
+  return TITLE_SCROLL_START_DELAY_MS +
+      (self->menu_layer.title_scroll_mode == SimplyMenuTitleScrollRelaxed ?
+          TITLE_SCROLL_RELAXED_EXTRA_MS : 0);
+}
+
+static uint32_t prv_title_scroll_end_pause(SimplyMenu *self) {
+  return TITLE_SCROLL_END_PAUSE_MS +
+      (self->menu_layer.title_scroll_mode == SimplyMenuTitleScrollRelaxed ?
+          TITLE_SCROLL_RELAXED_EXTRA_MS : 0);
+}
+
 static void prv_title_scroll_schedule(SimplyMenu *self, SimplyMenuScrollState state,
                                       uint32_t delay_ms) {
   SimplyMenuTitleScroll *scroll = &self->title_scroll;
@@ -393,9 +408,10 @@ static void prv_title_scroll_reset(SimplyMenu *self) {
   SimplyMenuTitleScroll *scroll = &self->title_scroll;
   scroll->max_offset = -1;
   scroll->cycles = 0;
-  if (self->menu_layer.menu_layer) {
+  if (self->menu_layer.menu_layer &&
+      self->menu_layer.title_scroll_mode != SimplyMenuTitleScrollOff) {
     scroll->index = menu_layer_get_selected_index(self->menu_layer.menu_layer);
-    prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, TITLE_SCROLL_START_DELAY_MS);
+    prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, prv_title_scroll_start_delay(self));
   }
 }
 
@@ -413,7 +429,7 @@ static void prv_title_scroll_timer_callback(void *data) {
       SimplyMenuItem *item = prv_get_menu_item(self, scroll->index.section, scroll->index.row);
       if (!item || !item->title || scroll->cell_size.w == 0) {
         // Not loaded or drawn yet: check again later.
-        prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, TITLE_SCROLL_START_DELAY_MS);
+        prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, prv_title_scroll_start_delay(self));
         return;
       }
       if (!prv_title_scroll_applies(item)) {
@@ -433,7 +449,7 @@ static void prv_title_scroll_timer_callback(void *data) {
     case SimplyMenuScrollScrolling:
       scroll->offset = MIN(scroll->offset + TITLE_SCROLL_STEP, scroll->max_offset);
       if (scroll->offset >= scroll->max_offset) {
-        prv_title_scroll_schedule(self, SimplyMenuScrollPaused, TITLE_SCROLL_END_PAUSE_MS);
+        prv_title_scroll_schedule(self, SimplyMenuScrollPaused, prv_title_scroll_end_pause(self));
       } else {
         prv_title_scroll_schedule(self, SimplyMenuScrollScrolling, TITLE_SCROLL_FRAME_MS);
       }
@@ -443,7 +459,7 @@ static void prv_title_scroll_timer_callback(void *data) {
       scroll->offset = 0;
       prv_mark_dirty(self);
       if (++scroll->cycles < TITLE_SCROLL_CYCLES) {
-        prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, TITLE_SCROLL_START_DELAY_MS);
+        prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, prv_title_scroll_start_delay(self));
       } else {
         scroll->state = SimplyMenuScrollIdle;
       }
@@ -846,6 +862,10 @@ static void prv_handle_menu_props_packet(Simply *simply, Packet *data) {
 
   simply_menu_set_num_sections(self, packet->num_sections);
   self->menu_layer.wrap = packet->wrap;
+  if (self->menu_layer.title_scroll_mode != packet->title_scroll_mode) {
+    self->menu_layer.title_scroll_mode = packet->title_scroll_mode;
+    prv_title_scroll_reset(self);
+  }
 
   if (!self->window.window) { return; }
 

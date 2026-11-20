@@ -15,6 +15,9 @@ var defaults = {
   // Whether up/down wrap around at the ends of the menu. Always sent, because the props packet
   // keeps the previous menu's value for any field a menu leaves out.
   wrap: false,
+  // How long titles scroll in the highlighted row: 'off', 'quick' or 'relaxed' (sent always, as
+  // above).
+  titleScroll: 'quick',
 };
 
 var Menu = function(menuDef) {
