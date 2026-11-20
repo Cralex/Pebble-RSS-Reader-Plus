@@ -41,11 +41,11 @@ var defaultFeeds = [{
 	title: "ProPublica",
 	url: "https://www.propublica.org/feeds/propublica/main"
 	},{
-	title: "The Verge",
-	url: "https://www.theverge.com/rss/index.xml"
+	title: "The Register",
+	url: "https://www.theregister.com/headlines.atom"
 	},{
-	title: "Techcrunch",
-	url: "https://techcrunch.com/feed/"
+	title: "MacRumors",
+	url: "https://feeds.macrumors.com/MacRumors-All"
 	},{
 	title: "SBNation",
 	url: "https://www.sbnation.com/rss/index.xml"
@@ -233,6 +233,8 @@ var BLOCK_TAGS = "p|h[1-6]|li|ul|ol|dl|dt|dd|div|blockquote|pre|figure|table|the
 var BLOCK_OPENING_TAG = new RegExp("<(" + BLOCK_TAGS + ")(\\s[^>]*)?\\/?>", "gi");
 var BLOCK_CLOSING_TAG = new RegExp("<\\/(" + BLOCK_TAGS + ")\\s*>", "gi");
 
+var WORDPRESS_FOOTER = /^The post .+ appeared first on .+$/;
+
 function makeArticleText(content) {
 	// Break lines around block elements, keeping their tags so formatText still sees whole
 	// elements, then split into paragraphs at line breaks. Without this, a heading and the
@@ -244,6 +246,11 @@ function makeArticleText(content) {
 		.replace(/(<\/t[dh]\s*>)\s*(<t[dh]\b)/gi, "$1 · $2")
 		.split(/[\r\n\t\f\v]+/);
 	paragraphs = paragraphs.map(formatText).filter(Boolean); //remove empty strings
+	// WordPress adds "The post <title> appeared first on <site>." to the end of every article in
+	// many feeds (ProPublica's, for one). Drop it when it's the whole last paragraph.
+	if (paragraphs.length > 1 && WORDPRESS_FOOTER.test(paragraphs[paragraphs.length - 1])) {
+		paragraphs.pop();
+	}
 
 	var first = "";
 	var units = [];
