@@ -524,6 +524,15 @@ var CardFitPacket = new struct([
   ['uint16', 'id'],
 ]);
 
+// Reading progress in a card's status bar: { mode: 'bar' | 'percent', percent: 0-100 } or false.
+var CardProgressModes = ['none', 'bar', 'percent'];
+
+var CardProgressPacket = new struct([
+  [Packet, 'packet'],
+  ['uint8', 'mode'],
+  ['uint8', 'percent'],
+]);
+
 var CardFitEventPacket = new struct([
   [Packet, 'packet'],
   ['uint16', 'id'],
@@ -832,6 +841,7 @@ var CommandPackets = [
   VoiceDictationDataPacket,
   CardFitPacket,
   CardFitEventPacket,
+  CardProgressPacket,
 ];
 
 var accelAxes = [
@@ -1119,6 +1129,13 @@ SimplyPebble.cardFit = function(fit) {
   SimplyPebble.sendPacket(CardFitPacket);
 };
 
+SimplyPebble.cardProgress = function(progress) {
+  var mode = progress ? CardProgressModes.indexOf(progress.mode) : 0;
+  var percent = progress ? Math.max(0, Math.min(100, Math.round(progress.percent) || 0)) : 0;
+  CardProgressPacket.mode(mode === -1 ? 0 : mode).percent(percent);
+  SimplyPebble.sendPacket(CardProgressPacket);
+};
+
 SimplyPebble.card = function(def, clear, pushing) {
   if (arguments.length === 3) {
     SimplyPebble.windowShow({ type: 'card', pushing: pushing });
@@ -1141,6 +1158,8 @@ SimplyPebble.card = function(def, clear, pushing) {
       SimplyPebble.cardStyle(k, def[k]);
     } else if (k === 'fit') {
       SimplyPebble.cardFit(def[k]);
+    } else if (k === 'progress') {
+      SimplyPebble.cardProgress(def[k]);
     }
   }
 };

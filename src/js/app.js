@@ -57,7 +57,8 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 	return configPage.url({
 		feeds: savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds,
 		wrapFeedList: wrapFeedList(),
-		titleScroll: titleScroll()
+		titleScroll: titleScroll(),
+		readingProgress: readingProgress()
 	});
 }, function(e){
 	if (!e.failed && e.options) {
@@ -65,6 +66,7 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		Settings.option("feeds", saved.feeds);
 		Settings.option("wrapFeedList", saved.wrapFeedList);
 		Settings.option("titleScroll", saved.titleScroll);
+		Settings.option("readingProgress", saved.readingProgress);
 	}
 	feedSelectMenu.hide(); // Will likely close app
 });
@@ -72,6 +74,12 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 /* Whether up/down wrap around at the ends of the feed list (a setting; on by default). */
 function wrapFeedList() {
 	return Settings.option("wrapFeedList") !== false;
+}
+
+/* How reading progress shows on article pages: 'bar' (default), 'percent' or 'off' (a setting). */
+function readingProgress() {
+	var mode = Settings.option("readingProgress");
+	return (mode === 'percent' || mode === 'off') ? mode : 'bar';
 }
 
 /* How long titles scroll in menus: 'relaxed' (default), 'quick' or 'off' (a setting). */
@@ -307,6 +315,31 @@ function pageBefore(page) {
 	return FIRST_PAGE;
 }
 
+/* How far through an article's text `chars` characters is, as a whole percentage. */
+function percentThrough(articleText, chars) {
+	var total = articleText.first.length;
+	articleText.units.forEach(function(unit) { total += unit.length; });
+	return total > 0 ? Math.min(100, Math.floor(100 * chars / total)) : 100;
+}
+
+/* Characters of an article's text before the start of `page`. */
+function charsBefore(articleText, page) {
+	if (page.unit < 0) {
+		return 0;
+	}
+	var chars = articleText.first.length;
+	for (var i = 0; i < page.unit; i++) {
+		chars += articleText.units[i].length;
+	}
+	return chars + page.offset;
+}
+
+/* Show reading progress in a card's status bar, as the setting says. */
+function showProgress(card, percent) {
+	var mode = readingProgress();
+	card.progress(mode === 'off' ? false : { mode: mode, percent: percent });
+}
+
 function nextFitId() {
 	lastFitId = (lastFitId % 65535) + 1; // 1..65535; 0 means "no fit"
 	return lastFitId;
@@ -430,6 +463,7 @@ function displayArticlePage(articleList, articleNum, page, history) {
 		}
 		articleCard.body(text.first);
 		nextPage = text.units.length > 0 ? { unit: 0, offset: 0 } : END_OF_ARTICLE;
+		showProgress(articleCard, nextPage ? percentThrough(text, text.first.length) : 100);
 		articleCard.action({
 			up: 'images/action_up.png',
 			select: nextPage ? "images/action_next.png" : "images/action_check.png",
@@ -451,6 +485,8 @@ function displayArticlePage(articleList, articleNum, page, history) {
 		articleCard.body(body);
 		articleCard.action(false);
 		articleCard.fit({ mode: isParagraphEnd ? 'end' : 'page', id: fitId });
+		// Until the watch says where this page ends, show where it starts.
+		showProgress(articleCard, percentThrough(text, charsBefore(text, page)));
 		articleCard.on('fit', function(e) {
 			if (e.id !== fitId) {
 				return;
@@ -460,6 +496,7 @@ function displayArticlePage(articleList, articleNum, page, history) {
 				shown = candidate.length; // Always make progress.
 			}
 			nextPage = pageAfter(text, page, shown);
+			showProgress(articleCard, nextPage ? percentThrough(text, charsBefore(text, page) + shown) : 100);
 		});
 	}
 

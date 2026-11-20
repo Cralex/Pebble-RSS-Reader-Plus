@@ -57,6 +57,15 @@ struct SimplyUiFit {
   char *text;          //!< What's drawn: the start of the body, plus "›" if it was cut
 };
 
+typedef enum SimplyUiProgressMode SimplyUiProgressMode;
+
+//! How reading progress is shown in the card's status bar.
+enum SimplyUiProgressMode {
+  SimplyUiProgressNone = 0,
+  SimplyUiProgressBar,     //!< A thin bar along the bottom of the status bar, under the clock
+  SimplyUiProgressPercent, //!< "42%" in place of the clock
+};
+
 typedef struct SimplyUiLayer SimplyUiLayer;
 
 struct SimplyUiLayer {
@@ -66,6 +75,9 @@ struct SimplyUiLayer {
   uint32_t imagefields[3];
   GFont custom_body_font;
   SimplyUiFit fit;
+  Layer *progress_layer; //!< Drawn over the status bar; see SimplyUiProgressMode
+  uint8_t progress_mode;
+  uint8_t progress_percent;
 };
 
 typedef struct SimplyUi SimplyUi;

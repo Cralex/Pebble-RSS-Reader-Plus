@@ -60,5 +60,6 @@ enum Command {
   CommandVoiceData,
   CommandCardFit,
   CommandCardFitEvent,
+  CommandCardProgress,
   NumCommands,
 };

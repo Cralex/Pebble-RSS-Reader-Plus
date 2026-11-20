@@ -103,6 +103,17 @@ function buildConfig(slotCount) {
 			{ label: 'Quick: start after 1 second', value: 'quick' },
 			{ label: 'Off', value: 'off' }
 		]
+	}, {
+		type: 'radiogroup',
+		messageKey: 'readingProgress',
+		label: 'Reading progress',
+		description: 'How far through an article you are, shown at the top of its pages.',
+		defaultValue: 'bar',
+		options: [
+			{ label: 'Bar under the clock', value: 'bar' },
+			{ label: 'Percentage instead of the clock', value: 'percent' },
+			{ label: 'Off', value: 'off' }
+		]
 	}];
 
 	return [{
@@ -336,7 +347,7 @@ function feedKey(url) {
 
 /*
  * A data: URL for the settings page, filled in with the given settings
- * ({ feeds, wrapFeedList, titleScroll }).
+ * ({ feeds, wrapFeedList, titleScroll, readingProgress }).
  */
 function url(settings) {
 	var feeds = settings.feeds;
@@ -344,7 +355,8 @@ function url(settings) {
 	var values = {
 		opmlImport: '',
 		wrapFeedList: settings.wrapFeedList,
-		titleScroll: settings.titleScroll
+		titleScroll: settings.titleScroll,
+		readingProgress: settings.readingProgress
 	};
 	for (var i = 1; i <= slotCount; i++) {
 		var feed = feeds[i - 1];
@@ -358,16 +370,18 @@ function url(settings) {
 
 /*
  * The settings in the page's response (Clay's { feedName1: { value: ... } } object):
- * { feeds, wrapFeedList, titleScroll }. The feeds are the slots in order, then any imported feeds whose
+ * { feeds, wrapFeedList, titleScroll, readingProgress }. The feeds are the slots in order, then any imported feeds whose
  * URLs aren't already in the list.
  */
 function settingsFromResponse(response) {
 	var wrap = response.wrapFeedList;
 	var scroll = response.titleScroll && response.titleScroll.value;
+	var progress = response.readingProgress && response.readingProgress.value;
 	return {
 		feeds: feedsFromResponse(response),
 		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true,
-		titleScroll: (scroll === 'quick' || scroll === 'off') ? scroll : 'relaxed'
+		titleScroll: (scroll === 'quick' || scroll === 'off') ? scroll : 'relaxed',
+		readingProgress: (progress === 'percent' || progress === 'off') ? progress : 'bar'
 	};
 }
 
