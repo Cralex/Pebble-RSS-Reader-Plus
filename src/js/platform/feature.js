@@ -26,6 +26,8 @@ Feature.blackAndWhite = Feature.makePlatformTest({
   chalk: false,
   diorite: true,
   emery: false,
+  flint: true,
+  gabbro: false,
 });
 
 Feature.color = Feature.makePlatformTest({
@@ -34,6 +36,8 @@ Feature.color = Feature.makePlatformTest({
   chalk: true,
   diorite: false,
   emery: true,
+  flint: false,
+  gabbro: true,
 });
 
 Feature.rectangle = Feature.makePlatformTest({
@@ -42,6 +46,8 @@ Feature.rectangle = Feature.makePlatformTest({
   chalk: false,
   diorite: true,
   emery: true,
+  flint: true,
+  gabbro: false,
 });
 
 Feature.round = Feature.makePlatformTest({
@@ -50,6 +56,8 @@ Feature.round = Feature.makePlatformTest({
   chalk: true,
   diorite: false,
   emery: false,
+  flint: false,
+  gabbro: true,
 });
 
 Feature.microphone = Feature.makePlatformTest({
@@ -58,6 +66,8 @@ Feature.microphone = Feature.makePlatformTest({
   chalk: true,
   diorite: true,
   emery: true,
+  flint: true,
+  gabbro: true,
 });
 
 Feature.resolution = Feature.makePlatformTest({
@@ -66,6 +76,8 @@ Feature.resolution = Feature.makePlatformTest({
   chalk: new Vector2(180, 180),
   diorite: new Vector2(144, 168),
   emery: new Vector2(200, 228),
+  flint: new Vector2(144, 168),
+  gabbro: new Vector2(260, 260),
 });
 
 Feature.actionBarWidth = function() {

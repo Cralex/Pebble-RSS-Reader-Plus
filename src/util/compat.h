@@ -9,7 +9,9 @@
  */
 
 // Compatibility definitions for aplite on 2.9
-#if !defined(PBL_PLATFORM_APLITE) && !defined(PBL_PLATFORM_BASALT) && !defined(PBL_PLATFORM_CHALK) && !defined(PBL_PLATFORM_DIORITE) && !defined(PBL_PLATFORM_EMERY)
+// (Only SDK 2 builds have none of these platforms. Newer platforms must be listed here too, or
+// they're treated as SDK 2.)
+#if !defined(PBL_PLATFORM_APLITE) && !defined(PBL_PLATFORM_BASALT) && !defined(PBL_PLATFORM_CHALK) && !defined(PBL_PLATFORM_DIORITE) && !defined(PBL_PLATFORM_EMERY) && !defined(PBL_PLATFORM_FLINT) && !defined(PBL_PLATFORM_GABBRO)
 
 #define PBL_SDK_2
 
