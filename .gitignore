@@ -1,3 +1,11 @@
 build/
 .lock-waf*
 .DS_Store
+
+# Store screenshots and listing assets (kept out of the repository)
+store/
+
+# Claude Code files
+.claude/
+CLAUDE.md
+CLAUDE.local.md
