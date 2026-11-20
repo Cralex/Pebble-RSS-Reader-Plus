@@ -12,6 +12,7 @@
 #include "util/graphics_text.h"
 #include "util/math.h"
 #include "util/noop.h"
+#include "util/platform.h"
 #include "util/string.h"
 #include "util/window.h"
 
@@ -116,6 +117,14 @@ struct __attribute__((__packed__)) CardFitPacket {
   Packet packet;
   uint8_t mode;
   uint16_t id;
+};
+
+typedef struct CardProgressPacket CardProgressPacket;
+
+struct __attribute__((__packed__)) CardProgressPacket {
+  Packet packet;
+  uint8_t mode;    //!< SimplyUiProgressMode
+  uint8_t percent; //!< 0-100
 };
 
 typedef struct CardFitEventPacket CardFitEventPacket;
@@ -716,6 +725,74 @@ static void layer_update_callback(Layer *layer, GContext *ctx) {
   graphics_text_attributes_destroy(body_attributes);
 }
 
+// ---- Reading progress in the status bar ----
+//
+// A layer on top of the status bar (a child of it, so it shows and hides with it) draws either a
+// thin bar along its bottom edge, under the clock, or the percentage in the clock's place. The
+// status bar itself can only show the clock, so the percentage covers it.
+
+//! The status bar's font and the gap below its text, as the firmware draws the clock.
+#if defined(PBL_PLATFORM_EMERY) || defined(PBL_PLATFORM_GABBRO)
+#define PROGRESS_FONT_KEY FONT_KEY_GOTHIC_18
+#define PROGRESS_FONT_HEIGHT 18
+#else
+#define PROGRESS_FONT_KEY FONT_KEY_GOTHIC_14
+#define PROGRESS_FONT_HEIGHT 14
+#endif
+#define PROGRESS_TEXT_BOTTOM_GAP 4
+#define PROGRESS_BAR_HEIGHT 2
+
+static void prv_progress_layer_update(Layer *layer, GContext *ctx) {
+  SimplyUi *self = *(SimplyUi **)layer_get_data(layer);
+  const uint8_t mode = self->ui_layer.progress_mode;
+  StatusBarLayer *status_bar = self->window.status_bar_layer;
+  if (mode == SimplyUiProgressNone || !status_bar) {
+    return;
+  }
+  const GRect bounds = layer_get_bounds(status_bar_layer_get_layer(status_bar));
+  const GColor background = status_bar_layer_get_background_color(status_bar);
+  const GColor foreground = status_bar_layer_get_foreground_color(status_bar);
+  const uint8_t percent = MIN(self->ui_layer.progress_percent, 100);
+
+  if (mode == SimplyUiProgressPercent) {
+    graphics_context_set_fill_color(ctx, background);
+    graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+    char text[5];
+    snprintf(text, sizeof(text), "%d%%", percent);
+    graphics_context_set_text_color(ctx, foreground);
+    graphics_draw_text(ctx, text, fonts_get_system_font(PROGRESS_FONT_KEY),
+                       GRect(0, bounds.size.h - PROGRESS_TEXT_BOTTOM_GAP - PROGRESS_FONT_HEIGHT,
+                             bounds.size.w, PROGRESS_FONT_HEIGHT),
+                       GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+    return;
+  }
+
+  // The bar runs across the part of the screen that's visible at its height: all of it on
+  // rectangular screens, the chord of the circle on round ones.
+  const int16_t y = bounds.size.h - PROGRESS_BAR_HEIGHT;
+  int16_t left = 0, width = bounds.size.w;
+#if defined(PBL_ROUND)
+  const int32_t radius = bounds.size.w / 2;
+  const int32_t from_center = radius - y;
+  const int16_t half = prv_isqrt(radius * radius - from_center * from_center);
+  left = radius - half;
+  width = 2 * half;
+#endif
+  graphics_context_set_fill_color(ctx, foreground);
+  graphics_fill_rect(ctx, GRect(left, y, width * percent / 100, PROGRESS_BAR_HEIGHT), 0,
+                     GCornerNone);
+}
+
+static void handle_card_progress_packet(Simply *simply, Packet *data) {
+  CardProgressPacket *packet = (CardProgressPacket*) data;
+  SimplyUiLayer *ui_layer = &simply->ui->ui_layer;
+  ui_layer->progress_mode = packet->mode;
+  ui_layer->progress_percent = packet->percent;
+  if (ui_layer->progress_layer) {
+    layer_mark_dirty(ui_layer->progress_layer);
+  }
+}
+
 static void show_welcome_text(SimplyUi *self) {
   if (simply_msg_has_communicated()) {
     return;
@@ -740,6 +817,18 @@ static void window_load(Window *window) {
   self->window.use_scroll_layer = true;
 
   simply_ui_set_style(self, StyleIndex_Default);
+
+  StatusBarLayer *status_bar = self->window.status_bar_layer;
+  if (status_bar) {
+    Layer *progress_layer = layer_create_with_data(
+        GRect(0, 0, frame.size.w, STATUS_BAR_LAYER_HEIGHT), sizeof(SimplyUi *));
+    if (progress_layer) {
+      *(SimplyUi **)layer_get_data(progress_layer) = self;
+      layer_set_update_proc(progress_layer, prv_progress_layer_update);
+      layer_add_child(status_bar_layer_get_layer(status_bar), progress_layer);
+    }
+    self->ui_layer.progress_layer = progress_layer;
+  }
 }
 
 static void window_appear(Window *window) {
@@ -759,6 +848,12 @@ static void window_unload(Window *window) {
 
   layer_destroy(self->ui_layer.layer);
   self->window.layer = self->ui_layer.layer = NULL;
+
+  if (self->ui_layer.progress_layer) {
+    layer_remove_from_parent(self->ui_layer.progress_layer);
+    layer_destroy(self->ui_layer.progress_layer);
+    self->ui_layer.progress_layer = NULL;
+  }
 
   simply_window_unload(&self->window);
 }
@@ -820,6 +915,9 @@ bool simply_ui_handle_packet(Simply *simply, Packet *packet) {
       return true;
     case CommandCardFit:
       handle_card_fit_packet(simply, packet);
+      return true;
+    case CommandCardProgress:
+      handle_card_progress_packet(simply, packet);
       return true;
   }
   return false;
