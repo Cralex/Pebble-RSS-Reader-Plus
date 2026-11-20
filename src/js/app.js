@@ -226,8 +226,23 @@ function getArticles(feed) {
 }
 
 
+// Elements that start a new paragraph. (Captions, asides and the like aren't here: formatText
+// removes those, so they need to stay in one piece with the paragraph around them.)
+// Table cells aren't: each row is one paragraph, with its cells separated by " · ".
+var BLOCK_TAGS = "p|h[1-6]|li|ul|ol|dl|dt|dd|div|blockquote|pre|figure|table|thead|tbody|tr|section|article|header|footer|hr";
+var BLOCK_OPENING_TAG = new RegExp("<(" + BLOCK_TAGS + ")(\\s[^>]*)?\\/?>", "gi");
+var BLOCK_CLOSING_TAG = new RegExp("<\\/(" + BLOCK_TAGS + ")\\s*>", "gi");
+
 function makeArticleText(content) {
-	var paragraphs = String(content || "").split(/<\/p>|<br>|[\r\n\t\f\v]+/gim);
+	// Break lines around block elements, keeping their tags so formatText still sees whole
+	// elements, then split into paragraphs at line breaks. Without this, a heading and the
+	// paragraph after it ("<h2>…beta 2</h2><p>Last Monday…") ran together as "beta 2Last Monday".
+	var paragraphs = String(content || "")
+		.replace(BLOCK_OPENING_TAG, "\n$&")
+		.replace(BLOCK_CLOSING_TAG, "$&\n")
+		.replace(/<br\b[^>]*>/gi, "\n")
+		.replace(/(<\/t[dh]\s*>)\s*(<t[dh]\b)/gi, "$1 · $2")
+		.split(/[\r\n\t\f\v]+/);
 	paragraphs = paragraphs.map(formatText).filter(Boolean); //remove empty strings
 
 	var first = "";
