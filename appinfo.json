@@ -14,8 +14,8 @@
         "type": "bitmap"
       },
       {
-        "file": "images/tile_splash.png",
-        "name": "IMAGE_TILE_SPLASH",
+        "file": "images/splash_logo.png",
+        "name": "IMAGE_LOGO_SPLASH",
         "type": "bitmap"
       },
       {
