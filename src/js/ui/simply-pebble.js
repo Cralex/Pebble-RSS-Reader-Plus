@@ -597,6 +597,13 @@ var TitleScrollType = function(x) {
   return index === -1 ? 1 : index;
 };
 
+// How fast long titles scroll, as a multiple of the normal speed ('1', '1.5' or '2'). Sent in
+// halves of the normal speed.
+var TitleScrollSpeedType = function(x) {
+  var halves = Math.round(Number(x) * 2);
+  return (halves >= 2 && halves <= 4) ? halves : 2;
+};
+
 var MenuPropsPacket = new struct([
   [Packet, 'packet'],
   ['uint16', 'sections', EnumerableType],
@@ -606,6 +613,7 @@ var MenuPropsPacket = new struct([
   ['uint8', 'highlightTextColor', ColorType],
   ['bool', 'wrap', BoolType],
   ['uint8', 'titleScroll', TitleScrollType],
+  ['uint8', 'titleScrollSpeed', TitleScrollSpeedType],
 ]);
 
 var MenuSectionPacket = new struct([

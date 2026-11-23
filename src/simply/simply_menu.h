@@ -34,6 +34,7 @@ struct SimplyMenuLayer {
   GColor8 highlight_background;
   bool wrap; //!< Whether up/down wrap around at the ends of the menu
   uint8_t title_scroll_mode; //!< SimplyMenuTitleScrollMode for long titles in this menu
+  uint8_t title_scroll_speed; //!< Title scrolling speed in halves of the normal speed (2 = 1x)
 };
 
 typedef enum SimplyMenuTitleScrollMode SimplyMenuTitleScrollMode;
@@ -66,6 +67,7 @@ struct SimplyMenuTitleScroll {
   GSize cell_size;      //!< Size of the highlighted cell when it was last drawn
   int16_t offset;       //!< How far the title is scrolled, in pixels
   int16_t max_offset;   //!< Offset that shows the end of the title; 0 if it fits, -1 if unknown
+  uint16_t frames;      //!< Frames scrolled so far in this cycle
   uint8_t cycles;
 };
 

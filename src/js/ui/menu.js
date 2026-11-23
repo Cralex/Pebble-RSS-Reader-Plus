@@ -18,6 +18,8 @@ var defaults = {
   // How long titles scroll in the highlighted row: 'off', 'quick' or 'relaxed' (sent always, as
   // above).
   titleScroll: 'quick',
+  // How fast long titles scroll: '1', '1.5' or '2' times the normal speed (sent always, as above).
+  titleScrollSpeed: '1',
 };
 
 var Menu = function(menuDef) {

@@ -105,6 +105,17 @@ function buildConfig(slotCount) {
 		]
 	}, {
 		type: 'radiogroup',
+		messageKey: 'titleScrollSpeed',
+		label: 'Title scrolling speed',
+		description: 'How fast a long title scrolls once it starts.',
+		defaultValue: '1',
+		options: [
+			{ label: '1x', value: '1' },
+			{ label: '1.5x', value: '1.5' },
+			{ label: '2x', value: '2' }
+		]
+	}, {
+		type: 'radiogroup',
 		messageKey: 'readingProgress',
 		label: 'Reading progress',
 		description: 'How far through an article you are, shown at the top of its pages.',
@@ -256,6 +267,16 @@ function pageScript() {
 			}
 		});
 
+		/* ---- Title scrolling speed: only shown while titles scroll ---- */
+
+		var scrollItem = clayConfig.getItemByMessageKey('titleScroll');
+		var speedItem = clayConfig.getItemByMessageKey('titleScrollSpeed');
+		function showScrollSpeed() {
+			if (scrollItem.get() === 'off') { speedItem.hide(); } else { speedItem.show(); }
+		}
+		scrollItem.on('change', showScrollSpeed);
+		showScrollSpeed();
+
 		/* ---- OPML import ---- */
 
 		var importBox = document.getElementById('opml-import');
@@ -347,7 +368,7 @@ function feedKey(url) {
 
 /*
  * A data: URL for the settings page, filled in with the given settings
- * ({ feeds, wrapFeedList, titleScroll, readingProgress }).
+ * ({ feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress }).
  */
 function url(settings) {
 	var feeds = settings.feeds;
@@ -356,6 +377,7 @@ function url(settings) {
 		opmlImport: '',
 		wrapFeedList: settings.wrapFeedList,
 		titleScroll: settings.titleScroll,
+		titleScrollSpeed: settings.titleScrollSpeed,
 		readingProgress: settings.readingProgress
 	};
 	for (var i = 1; i <= slotCount; i++) {
@@ -370,17 +392,19 @@ function url(settings) {
 
 /*
  * The settings in the page's response (Clay's { feedName1: { value: ... } } object):
- * { feeds, wrapFeedList, titleScroll, readingProgress }. The feeds are the slots in order, then any imported feeds whose
+ * { feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress }. The feeds are the slots in order, then any imported feeds whose
  * URLs aren't already in the list.
  */
 function settingsFromResponse(response) {
 	var wrap = response.wrapFeedList;
 	var scroll = response.titleScroll && response.titleScroll.value;
+	var speed = response.titleScrollSpeed && response.titleScrollSpeed.value;
 	var progress = response.readingProgress && response.readingProgress.value;
 	return {
 		feeds: feedsFromResponse(response),
 		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true,
 		titleScroll: (scroll === 'quick' || scroll === 'off') ? scroll : 'relaxed',
+		titleScrollSpeed: (speed === '1.5' || speed === '2') ? speed : '1',
 		readingProgress: (progress === 'percent' || progress === 'off') ? progress : 'bar'
 	};
 }

@@ -58,6 +58,7 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		feeds: savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds,
 		wrapFeedList: wrapFeedList(),
 		titleScroll: titleScroll(),
+		titleScrollSpeed: titleScrollSpeed(),
 		readingProgress: readingProgress()
 	});
 }, function(e){
@@ -66,6 +67,7 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		Settings.option("feeds", saved.feeds);
 		Settings.option("wrapFeedList", saved.wrapFeedList);
 		Settings.option("titleScroll", saved.titleScroll);
+		Settings.option("titleScrollSpeed", saved.titleScrollSpeed);
 		Settings.option("readingProgress", saved.readingProgress);
 	}
 	feedSelectMenu.hide(); // Will likely close app
@@ -86,6 +88,12 @@ function readingProgress() {
 function titleScroll() {
 	var mode = Settings.option("titleScroll");
 	return (mode === 'quick' || mode === 'off') ? mode : 'relaxed';
+}
+
+/* How fast long titles scroll in menus: '1' (default), '1.5' or '2' times (a setting). */
+function titleScrollSpeed() {
+	var speed = Settings.option("titleScrollSpeed");
+	return (speed === '1.5' || speed === '2') ? speed : '1';
 }
 
 /*-----------------------------------------------------------------------------*/
@@ -149,6 +157,7 @@ function selectFeed() {
 		status: false,
 		wrap: wrapFeedList(),
 		titleScroll: titleScroll(),
+		titleScrollSpeed: titleScrollSpeed(),
 		sections: [{
 			title: "Select Feed:",
 			items: feeds
@@ -411,6 +420,7 @@ function selectArticle(articleList, heading) {
 	articleSelectMenu = new UI.Menu({
 		status: false,
 		titleScroll: titleScroll(),
+		titleScrollSpeed: titleScrollSpeed(),
 		sections: [{
 			title: heading,
 			items: articleList

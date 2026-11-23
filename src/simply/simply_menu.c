@@ -46,6 +46,7 @@ struct __attribute__((__packed__)) MenuPropsPacket {
   GColor8 highlight_text_color;
   bool wrap;
   uint8_t title_scroll_mode;
+  uint8_t title_scroll_speed;
 };
 
 typedef struct MenuSectionPacket MenuSectionPacket;
@@ -270,7 +271,8 @@ static void prv_reload_data(SimplyMenu *self) {
 // scrolling, prv_draw_scrolled_title draws the title in the same place, offset by the scroll.
 // The layout constants mirror the firmware's menu_layer_system_cells.c.
 
-// Quick timings; Relaxed adds TITLE_SCROLL_RELAXED_EXTRA_MS to both.
+// Quick timings; Relaxed adds TITLE_SCROLL_RELAXED_EXTRA_MS to both. TITLE_SCROLL_STEP is the
+// distance per frame at normal speed; the speed setting multiplies it.
 #define TITLE_SCROLL_START_DELAY_MS 1000
 #define TITLE_SCROLL_END_PAUSE_MS 1500
 #define TITLE_SCROLL_RELAXED_EXTRA_MS 1000
@@ -398,6 +400,7 @@ static void prv_title_scroll_stop(SimplyMenu *self) {
     scroll->timer = NULL;
   }
   scroll->state = SimplyMenuScrollIdle;
+  scroll->frames = 0;
   if (scroll->offset) {
     scroll->offset = 0;
     prv_mark_dirty(self);
@@ -448,8 +451,13 @@ static void prv_title_scroll_timer_callback(void *data) {
       prv_title_scroll_schedule(self, SimplyMenuScrollScrolling, TITLE_SCROLL_FRAME_MS);
       return;
     }
-    case SimplyMenuScrollScrolling:
-      scroll->offset = MIN(scroll->offset + TITLE_SCROLL_STEP, scroll->max_offset);
+    case SimplyMenuScrollScrolling: {
+      // The speed is in halves, so work out the offset from the frame count: at 1.5x a 1-pixel
+      // step alternates between 1 and 2 pixels instead of rounding to one of them.
+      const uint8_t speed = self->menu_layer.title_scroll_speed ?: 2;
+      scroll->frames++;
+      scroll->offset = MIN((int32_t)scroll->frames * TITLE_SCROLL_STEP * speed / 2,
+                           scroll->max_offset);
       if (scroll->offset >= scroll->max_offset) {
         prv_title_scroll_schedule(self, SimplyMenuScrollPaused, prv_title_scroll_end_pause(self));
       } else {
@@ -457,8 +465,10 @@ static void prv_title_scroll_timer_callback(void *data) {
       }
       prv_mark_dirty(self);
       return;
+    }
     case SimplyMenuScrollPaused:
       scroll->offset = 0;
+      scroll->frames = 0;
       prv_mark_dirty(self);
       if (++scroll->cycles < TITLE_SCROLL_CYCLES) {
         prv_title_scroll_schedule(self, SimplyMenuScrollWaiting, prv_title_scroll_start_delay(self));
@@ -864,6 +874,7 @@ static void prv_handle_menu_props_packet(Simply *simply, Packet *data) {
 
   simply_menu_set_num_sections(self, packet->num_sections);
   self->menu_layer.wrap = packet->wrap;
+  self->menu_layer.title_scroll_speed = packet->title_scroll_speed;
   if (self->menu_layer.title_scroll_mode != packet->title_scroll_mode) {
     self->menu_layer.title_scroll_mode = packet->title_scroll_mode;
     prv_title_scroll_reset(self);
