@@ -53,9 +53,8 @@ var defaultFeeds = [{
 
 // The settings page is generated on the phone (see configpage.js); the url here is unused.
 Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
-	var savedFeeds = Settings.option().feeds;
 	return configPage.url({
-		feeds: savedFeeds && savedFeeds.length > 0 ? savedFeeds : defaultFeeds,
+		feeds: savedFeeds(),
 		wrapFeedList: wrapFeedList(),
 		titleScroll: titleScroll(),
 		titleScrollSpeed: titleScrollSpeed(),
@@ -69,9 +68,36 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		Settings.option("titleScroll", saved.titleScroll);
 		Settings.option("titleScrollSpeed", saved.titleScrollSpeed);
 		Settings.option("readingProgress", saved.readingProgress);
+		applySettings();
 	}
-	feedSelectMenu.hide(); // Will likely close app
 });
+
+/*
+ * Apply newly saved settings to the open app. Menus update right away if they're on screen and
+ * otherwise when they're next shown; reading progress is read each time an article page is shown.
+ */
+function applySettings() {
+	var menuSettings = { titleScroll: titleScroll(), titleScrollSpeed: titleScrollSpeed() };
+	if (articleSelectMenuExists) {
+		articleSelectMenu.prop(menuSettings);
+	}
+	menuSettings.wrap = wrapFeedList();
+	feedSelectMenu.prop(menuSettings);
+
+	feeds = savedFeeds();
+	feedSelectMenu.items(0, feeds);
+	// Keep the highlight on the list if feeds were removed from the end.
+	var selected = feedSelectMenu._selection;
+	if (selected.itemIndex >= feeds.length) {
+		feedSelectMenu.selection(0, feeds.length - 1);
+	}
+}
+
+/* The saved feeds, or the default ones if none are saved. */
+function savedFeeds() {
+	var saved = Settings.option("feeds");
+	return saved && saved.length > 0 ? saved : defaultFeeds;
+}
 
 /* Whether up/down wrap around at the ends of the feed list (a setting; on by default). */
 function wrapFeedList() {
@@ -145,13 +171,7 @@ function saveCurrPage(articleCard, articleList, articleNum, page, history) {
 
 function selectFeed() {
 
-	/*Overwrite default feeds with what user input in Settings.*/
-	if (typeof Settings.option().feeds !== 'undefined' && Settings.option().feeds.length > 0) {
-		feeds = Settings.option().feeds;
-	}
-	else {
-		feeds = defaultFeeds;
-	}
+	feeds = savedFeeds();
 
 	feedSelectMenu = new UI.Menu({
 		status: false,
