@@ -248,8 +248,10 @@ function getArticles(feed) {
 	var screen = Feature.resolution();
 	var colors = themeColors();
 	loadingCard = new UI.Window({status: themedStatusBar(), backgroundColor: colors.page});
+	// Centered on the screen. The window's content starts below the status bar, and Gothic 24
+	// Bold's letters sit about 18 px down its 32 px line.
 	loadingCard.add(new UI.Text({
-		position: new Vector2(0, Math.round(screen.y / 2) - 16),
+		position: new Vector2(0, Math.round(screen.y / 2) - Feature.statusBarHeight() - 18),
 		size: new Vector2(screen.x, 32),
 		text: "Loading...",
 		font: 'gothic-24-bold',

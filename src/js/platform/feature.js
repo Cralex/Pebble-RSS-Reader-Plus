@@ -84,6 +84,13 @@ Feature.actionBarWidth = function() {
   return Feature.rectangle(30, 40);
 };
 
-Feature.statusBarHeight = function() {
-  return 16;
-};
+// STATUS_BAR_LAYER_HEIGHT from the SDK.
+Feature.statusBarHeight = Feature.makePlatformTest({
+  aplite: 16,
+  basalt: 16,
+  chalk: 24,
+  diorite: 16,
+  emery: 20,
+  flint: 16,
+  gabbro: 20,
+});
