@@ -165,10 +165,12 @@ Menu.prototype._resolveMenu = function(clear, pushing) {
 Menu.prototype._resolveSection = function(e, clear) {
   var section = this._getSection(e);
   if (!section) { return; }
+  // Fill in the menu's colors on a copy: written into the section itself, they would stay after
+  // the menu's colors change.
   section = myutil.shadow({
-    textColor: this.state.textColor, 
+    textColor: this.state.textColor,
     backgroundColor: this.state.backgroundColor
-  }, section);
+  }, util2.copy(section));
   section.items = this._getItems(e);
   if (this === WindowStack.top()) {
     simply.impl.menuSection.call(this, e.sectionIndex, section, clear);

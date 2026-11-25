@@ -22,11 +22,6 @@ var FIRST_PAGE = { unit: -1, offset: 0 };
 var END_OF_ARTICLE = null;
 var lastFitId = 0;
 
-var blackStatusBar = {
-	color: "white",
-	backgroundColor: "black",
-	separator: 'none'
-};
 
 var defaultFeeds = [{
 	title: "Vox",
@@ -59,7 +54,8 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		titleScroll: titleScroll(),
 		titleScrollSpeed: titleScrollSpeed(),
 		readingProgress: readingProgress(),
-		shrinkParagraphEnds: shrinkParagraphEnds()
+		shrinkParagraphEnds: shrinkParagraphEnds(),
+		theme: theme()
 	});
 }, function(e){
 	if (!e.failed && e.options) {
@@ -70,17 +66,18 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		Settings.option("titleScrollSpeed", saved.titleScrollSpeed);
 		Settings.option("readingProgress", saved.readingProgress);
 		Settings.option("shrinkParagraphEnds", saved.shrinkParagraphEnds);
+		Settings.option("theme", saved.theme);
 		applySettings();
 	}
 });
 
 /*
  * Apply newly saved settings to the open app. Menus update right away if they're on screen and
- * otherwise when they're next shown; reading progress and text shrinking are read each time an
- * article page is shown.
+ * otherwise when they're next shown; colors, reading progress and text shrinking are read each
+ * time a page is shown.
  */
 function applySettings() {
-	var menuSettings = { titleScroll: titleScroll(), titleScrollSpeed: titleScrollSpeed() };
+	var menuSettings = themedMenu({ titleScroll: titleScroll(), titleScrollSpeed: titleScrollSpeed() });
 	if (articleSelectMenuExists) {
 		articleSelectMenu.prop(menuSettings);
 	}
@@ -100,6 +97,41 @@ function applySettings() {
 function savedFeeds() {
 	var saved = Settings.option("feeds");
 	return saved && saved.length > 0 ? saved : defaultFeeds;
+}
+
+/* The color scheme: 'light' (black text on white, the default) or 'dark' (a setting). */
+function theme() {
+	return Settings.option("theme") === 'dark' ? 'dark' : 'light';
+}
+
+function themeColors() {
+	return theme() === 'dark' ? { page: 'black', text: 'white' } : { page: 'white', text: 'black' };
+}
+
+/* The status bar is the reverse of the page, so the clock and reading progress stand out. */
+function themedStatusBar() {
+	var colors = themeColors();
+	return { color: colors.page, backgroundColor: colors.text, separator: 'none' };
+}
+
+/* A card definition (def, or an empty one) with the theme's colors added. */
+function themedCard(def) {
+	def = def || {};
+	var colors = themeColors();
+	def.status = themedStatusBar();
+	def.backgroundColor = colors.page;
+	def.titleColor = def.subtitleColor = def.bodyColor = colors.text;
+	return def;
+}
+
+/* A menu definition with the theme's colors added; the highlighted row is reversed. */
+function themedMenu(def) {
+	var colors = themeColors();
+	def.backgroundColor = colors.page;
+	def.textColor = colors.text;
+	def.highlightBackgroundColor = colors.text;
+	def.highlightTextColor = colors.page;
+	return def;
 }
 
 /*
@@ -184,7 +216,7 @@ function selectFeed() {
 
 	feeds = savedFeeds();
 
-	feedSelectMenu = new UI.Menu({
+	feedSelectMenu = new UI.Menu(themedMenu({
 		status: false,
 		wrap: wrapFeedList(),
 		titleScroll: titleScroll(),
@@ -193,7 +225,7 @@ function selectFeed() {
 			title: "Select Feed:",
 			items: feeds
 		}]
-	});
+	}));
 
 	feedSelectMenu.show();
 
@@ -214,13 +246,14 @@ function selectFeed() {
 function getArticles(feed) {
 	// A plain window with centered text: cards can't center text on rectangular screens.
 	var screen = Feature.resolution();
-	loadingCard = new UI.Window({status: blackStatusBar, backgroundColor: 'white'});
+	var colors = themeColors();
+	loadingCard = new UI.Window({status: themedStatusBar(), backgroundColor: colors.page});
 	loadingCard.add(new UI.Text({
 		position: new Vector2(0, Math.round(screen.y / 2) - 16),
 		size: new Vector2(screen.x, 32),
 		text: "Loading...",
 		font: 'gothic-24-bold',
-		color: 'black',
+		color: colors.text,
 		textAlign: 'center'
 	}));
 	loadingCard.show();
@@ -231,7 +264,7 @@ function getArticles(feed) {
 	articleList = [];
 
 	function showLoadError(message) {
-		var problemCard = new UI.Card({status: blackStatusBar, scrollable: true});
+		var problemCard = new UI.Card(themedCard({scrollable: true}));
 		problemCard.body(message);
 		problemCard.show();
 		loadingCard.hide();
@@ -448,7 +481,7 @@ function selectArticle(articleList, heading) {
 		articleDisplayTitles = articleList;
 	}*/
 
-	articleSelectMenu = new UI.Menu({
+	articleSelectMenu = new UI.Menu(themedMenu({
 		status: false,
 		titleScroll: titleScroll(),
 		titleScrollSpeed: titleScrollSpeed(),
@@ -456,7 +489,7 @@ function selectArticle(articleList, heading) {
 			title: heading,
 			items: articleList
 		}]
-	});
+	}));
 
 	articleSelectMenu.show();
 	articleSelectMenuExists = true;
@@ -488,7 +521,7 @@ function selectArticle(articleList, heading) {
 function displayArticlePage(articleList, articleNum, page, history) {
 	var article = articleList[articleNum];
 	var text = article.text;
-	var articleCard = new UI.Card({status: blackStatusBar});
+	var articleCard = new UI.Card(themedCard());
 	var nextPage; // undefined until known; END_OF_ARTICLE (null) after the last page
 
 	if (page.unit < 0) {
@@ -623,7 +656,7 @@ function welcomeScreen() {
 
 function welcomeScreen1() {
 	Settings.data('lastSeenWelcomeScreenNum', 1);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.scrollable(true);
 	welcomeCard.action({
 		up: 'images/action_up.png',
@@ -644,7 +677,7 @@ function welcomeScreen1() {
 
 function welcomeScreen2() {
 	Settings.data('lastSeenWelcomeScreenNum', 2);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.body("Press the BACK or UP buttons to return to the previous page.\n\nPress the SELECT or DOWN buttons to go to the next page.");
 	welcomeCard.show();
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.
@@ -654,7 +687,7 @@ function welcomeScreen2() {
 
 function welcomeScreen3(){
 	Settings.data('lastSeenWelcomeScreenNum', 3);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.body("Some paragraphs are too long to fit on a single page. If you see a symbol at the end of a page, it ›");
 	welcomeCard.show();
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.
@@ -664,7 +697,7 @@ function welcomeScreen3(){
 
 function welcomeScreen4(){
 	Settings.data('lastSeenWelcomeScreenNum', 4);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.body("‹ means that the current paragraph will be continued on the next page.");
 	welcomeCard.show();
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.
@@ -674,7 +707,7 @@ function welcomeScreen4(){
 
 function welcomeScreen5(){
 	Settings.data('lastSeenWelcomeScreenNum', 5);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.body("Hold down the BACK button to exit the app. We'll remember where you left off.");
 	welcomeCard.show();
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.
@@ -684,7 +717,7 @@ function welcomeScreen5(){
 
 function welcomeScreen6(){
 	Settings.data('lastSeenWelcomeScreenNum', 6);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.body("Hold down the SELECT button to open the menu. Do it again to return to what you were reading.");
 	welcomeCard.show();
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.
@@ -694,7 +727,7 @@ function welcomeScreen6(){
 
 function welcomeScreen7(){
 	Settings.data('lastSeenWelcomeScreenNum', 7);
-	welcomeCard = new UI.Card({status: blackStatusBar});
+	welcomeCard = new UI.Card(themedCard());
 	welcomeCard.body("That's all for now! Open the menu to choose a feed.");
 	welcomeCard.show();
 	welcomeCard.on('click', 'back', function(){}); //Disable back button.

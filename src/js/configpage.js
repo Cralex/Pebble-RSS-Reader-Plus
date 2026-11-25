@@ -87,6 +87,15 @@ function buildConfig(slotCount) {
 		type: 'heading',
 		defaultValue: 'Options'
 	}, {
+		type: 'radiogroup',
+		messageKey: 'theme',
+		label: 'Colors',
+		defaultValue: 'light',
+		options: [
+			{ label: 'Black text on white', value: 'light' },
+			{ label: 'White text on black', value: 'dark' }
+		]
+	}, {
 		type: 'toggle',
 		messageKey: 'wrapFeedList',
 		label: 'Wrap around the feed list',
@@ -375,7 +384,8 @@ function feedKey(url) {
 
 /*
  * A data: URL for the settings page, filled in with the given settings
- * ({ feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress, shrinkParagraphEnds }).
+ * ({ feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress, shrinkParagraphEnds,
+ * theme }).
  */
 function url(settings) {
 	var feeds = settings.feeds;
@@ -386,7 +396,8 @@ function url(settings) {
 		titleScroll: settings.titleScroll,
 		titleScrollSpeed: settings.titleScrollSpeed,
 		readingProgress: settings.readingProgress,
-		shrinkParagraphEnds: settings.shrinkParagraphEnds
+		shrinkParagraphEnds: settings.shrinkParagraphEnds,
+		theme: settings.theme
 	};
 	for (var i = 1; i <= slotCount; i++) {
 		var feed = feeds[i - 1];
@@ -400,8 +411,8 @@ function url(settings) {
 
 /*
  * The settings in the page's response (Clay's { feedName1: { value: ... } } object):
- * { feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress, shrinkParagraphEnds }. The
- * feeds are the slots in order, then any imported feeds whose URLs aren't already in the list.
+ * { feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress, shrinkParagraphEnds,
+ * theme }. The feeds are the slots in order, then any imported feeds whose URLs aren't already in the list.
  */
 function settingsFromResponse(response) {
 	var wrap = response.wrapFeedList;
@@ -409,13 +420,15 @@ function settingsFromResponse(response) {
 	var speed = response.titleScrollSpeed && response.titleScrollSpeed.value;
 	var progress = response.readingProgress && response.readingProgress.value;
 	var shrink = response.shrinkParagraphEnds;
+	var theme = response.theme && response.theme.value;
 	return {
 		feeds: feedsFromResponse(response),
 		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true,
 		titleScroll: (scroll === 'quick' || scroll === 'off') ? scroll : 'relaxed',
 		titleScrollSpeed: (speed === '1.5' || speed === '2') ? speed : '1',
 		readingProgress: (progress === 'percent' || progress === 'off') ? progress : 'bar',
-		shrinkParagraphEnds: shrink && typeof shrink.value === 'boolean' ? shrink.value : true
+		shrinkParagraphEnds: shrink && typeof shrink.value === 'boolean' ? shrink.value : true,
+		theme: theme === 'dark' ? 'dark' : 'light'
 	};
 }
 

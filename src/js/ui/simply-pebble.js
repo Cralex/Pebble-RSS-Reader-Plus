@@ -1151,7 +1151,10 @@ SimplyPebble.card = function(def, clear, pushing) {
   if (clear !== undefined) {
     SimplyPebble.cardClear(clear);
   }
-  SimplyPebble.windowProps(def);
+  // `def` may hold only the changed properties (card.progress(...) sends just `progress`), but the
+  // window props packet sets the background and scrolling every time, so send them from the
+  // card's whole state (`this` is the card) rather than resetting them to the defaults.
+  SimplyPebble.windowProps(this && this.state ? this.state : def);
   SimplyPebble.windowStatusBarCompat(def);
   if (def.action !== undefined) {
     SimplyPebble.windowActionBar(def.action);
