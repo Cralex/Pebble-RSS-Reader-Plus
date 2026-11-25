@@ -125,6 +125,13 @@ function buildConfig(slotCount) {
 			{ label: 'Percentage instead of the clock', value: 'percent' },
 			{ label: 'Off', value: 'off' }
 		]
+	}, {
+		type: 'toggle',
+		messageKey: 'shrinkParagraphEnds',
+		label: 'Shrink text to finish a paragraph',
+		description: 'When the end of a paragraph just misses fitting on a page, show it in smaller text ' +
+			'rather than putting the last few words on a page of their own. Off: text is never shrunk.',
+		defaultValue: true
 	}];
 
 	return [{
@@ -368,7 +375,7 @@ function feedKey(url) {
 
 /*
  * A data: URL for the settings page, filled in with the given settings
- * ({ feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress }).
+ * ({ feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress, shrinkParagraphEnds }).
  */
 function url(settings) {
 	var feeds = settings.feeds;
@@ -378,7 +385,8 @@ function url(settings) {
 		wrapFeedList: settings.wrapFeedList,
 		titleScroll: settings.titleScroll,
 		titleScrollSpeed: settings.titleScrollSpeed,
-		readingProgress: settings.readingProgress
+		readingProgress: settings.readingProgress,
+		shrinkParagraphEnds: settings.shrinkParagraphEnds
 	};
 	for (var i = 1; i <= slotCount; i++) {
 		var feed = feeds[i - 1];
@@ -392,20 +400,22 @@ function url(settings) {
 
 /*
  * The settings in the page's response (Clay's { feedName1: { value: ... } } object):
- * { feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress }. The feeds are the slots in order, then any imported feeds whose
- * URLs aren't already in the list.
+ * { feeds, wrapFeedList, titleScroll, titleScrollSpeed, readingProgress, shrinkParagraphEnds }. The
+ * feeds are the slots in order, then any imported feeds whose URLs aren't already in the list.
  */
 function settingsFromResponse(response) {
 	var wrap = response.wrapFeedList;
 	var scroll = response.titleScroll && response.titleScroll.value;
 	var speed = response.titleScrollSpeed && response.titleScrollSpeed.value;
 	var progress = response.readingProgress && response.readingProgress.value;
+	var shrink = response.shrinkParagraphEnds;
 	return {
 		feeds: feedsFromResponse(response),
 		wrapFeedList: wrap && typeof wrap.value === 'boolean' ? wrap.value : true,
 		titleScroll: (scroll === 'quick' || scroll === 'off') ? scroll : 'relaxed',
 		titleScrollSpeed: (speed === '1.5' || speed === '2') ? speed : '1',
-		readingProgress: (progress === 'percent' || progress === 'off') ? progress : 'bar'
+		readingProgress: (progress === 'percent' || progress === 'off') ? progress : 'bar',
+		shrinkParagraphEnds: shrink && typeof shrink.value === 'boolean' ? shrink.value : true
 	};
 }
 

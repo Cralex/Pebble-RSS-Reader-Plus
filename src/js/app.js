@@ -58,7 +58,8 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		wrapFeedList: wrapFeedList(),
 		titleScroll: titleScroll(),
 		titleScrollSpeed: titleScrollSpeed(),
-		readingProgress: readingProgress()
+		readingProgress: readingProgress(),
+		shrinkParagraphEnds: shrinkParagraphEnds()
 	});
 }, function(e){
 	if (!e.failed && e.options) {
@@ -68,13 +69,15 @@ Settings.config({url: 'about:blank', hash: false, autoSave: false}, function(){
 		Settings.option("titleScroll", saved.titleScroll);
 		Settings.option("titleScrollSpeed", saved.titleScrollSpeed);
 		Settings.option("readingProgress", saved.readingProgress);
+		Settings.option("shrinkParagraphEnds", saved.shrinkParagraphEnds);
 		applySettings();
 	}
 });
 
 /*
  * Apply newly saved settings to the open app. Menus update right away if they're on screen and
- * otherwise when they're next shown; reading progress is read each time an article page is shown.
+ * otherwise when they're next shown; reading progress and text shrinking are read each time an
+ * article page is shown.
  */
 function applySettings() {
 	var menuSettings = { titleScroll: titleScroll(), titleScrollSpeed: titleScrollSpeed() };
@@ -97,6 +100,14 @@ function applySettings() {
 function savedFeeds() {
 	var saved = Settings.option("feeds");
 	return saved && saved.length > 0 ? saved : defaultFeeds;
+}
+
+/*
+ * Whether the end of a paragraph that just misses fitting on a page is shown in smaller text
+ * rather than leaving its last few words for a page of their own (a setting; on by default).
+ */
+function shrinkParagraphEnds() {
+	return Settings.option("shrinkParagraphEnds") !== false;
 }
 
 /* Whether up/down wrap around at the ends of the feed list (a setting; on by default). */
@@ -514,7 +525,8 @@ function displayArticlePage(articleList, articleNum, page, history) {
 		articleCard.scrollable(false);
 		articleCard.body(body);
 		articleCard.action(false);
-		articleCard.fit({ mode: isParagraphEnd ? 'end' : 'page', id: fitId });
+		// 'end' lets the watch shrink the text to finish the paragraph on this page.
+		articleCard.fit({ mode: isParagraphEnd && shrinkParagraphEnds() ? 'end' : 'page', id: fitId });
 		// Until the watch says where this page ends, show where it starts.
 		showProgress(articleCard, percentThrough(text, charsBefore(text, page)));
 		articleCard.on('fit', function(e) {
